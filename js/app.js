@@ -1,144 +1,162 @@
 import { db } from './firebase-config.js';
-import { getTelegramUser, initializeUser, createUser, getUserData } from './auth.js';
-import { loadMatches, loadGameweeks, currentGameweek } from './matches.js';
-import { loadLeaderboard } from './leaderboard.js';
-import { loadProfile } from './profile.js';
-import { initializeAdmin } from './admin.js';
+import { collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-// Initialize Telegram WebApp
-const tg = window.Telegram.WebApp;
-tg.expand();
-tg.ready();
+export let currentGameweek = 31;
+let allGameweeks = [];
 
-// Get Telegram user info
-const telegramUser = getTelegramUser();
-const userId = telegramUser?.id || null;
-const username = telegramUser?.username || null;
-
-// Store userId globally for other modules
-window.telegramUserId = userId;
-
-// Global state
-let currentUser = null;
-let currentGameweekNum = 1;
-
-// Initialize App
-async function initializeApp() {
-    // Hide loading screen
-    document.getElementById('loading-screen').classList.remove('active');
-    
-    if (!userId) {
-        // Not opened from Telegram
-        document.getElementById('login-screen').innerHTML = `
-            <div class="login-container">
-                <h1>⚽ EPL Predictor</h1>
-                <p style="color: var(--danger);">⚠️ This app only works inside Telegram!</p>
-                <p>Please open this app from your Telegram bot.</p>
-                <button onclick="window.location.reload()" class="btn-primary">Try Again</button>
-            </div>
-        `;
-        showScreen('login-screen');
-        return;
-    }
-
+export async function loadGameweeks() {
     try {
-        // Check if user exists in database
-        currentUser = await initializeUser(userId);
+        const matchesRef = collection(db, 'matches');
+        const q = query(matchesRef, orderBy('gameweek', 'asc'));
+        const querySnapshot = await getDocs(q);
         
-        if (!currentUser) {
-            // New user - show registration screen
-            showScreen('login-screen');
-            document.getElementById('login-btn').addEventListener('click', handleRegistration);
-        } else {
-            // Existing user - show main app
-            showScreen('main-app');
-            loadInitialData();
-        }
-    } catch (error) {
-        console.error('Initialization error:', error);
-        showMessage('Error loading app. Please try again.', 'error');
-    }
-}
-
-// Handle new user registration
-async function handleRegistration() {
-    const displayName = document.getElementById('display-name-input').value.trim();
-    const favoriteTeam = document.getElementById('favorite-team-select').value;
-    
-    if (!displayName) {
-        alert('Please enter your display name');
-        return;
-    }
-    
-    try {
-        await createUser(userId, {
-            displayName,
-            favoriteTeam,
-            username: username || `user_${userId}`
+        const gameweeks = new Set();
+        querySnapshot.forEach((doc) => {
+            gameweeks.add(doc.data().gameweek);
         });
         
-        currentUser = await getUserData(userId);
-        showScreen('main-app');
-        loadInitialData();
+        allGameweeks = Array.from(gameweeks).sort((a, b) => a - b);
+        updateAdminGameweekSelectors();
+        return allGameweeks;
     } catch (error) {
-        alert('Error creating profile. Please try again.');
-        console.error(error);
+        console.error('Error loading gameweeks:', error);
+        return [31];
     }
 }
 
-function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
+export async function loadMatches(gameweek) {
+    const container = document.getElementById('matches-list');
+    if (!container) {
+        console.error('❌ matches-list container not found');
+        return;
+    }
+    
+    container.innerHTML = '<div style="padding:20px;text-align:center;">Loading Gameweek ' + gameweek + '...</div>';
+    
+    try {
+        console.log('🔍 Loading matches for GW' + gameweek);
+        
+        const matchesRef = collection(db, 'matches');
+        
+        // Simple query - filter by gameweek only
+        const q = query(
+            matchesRef,
+            where('gameweek', '==', parseInt(gameweek))
+            // Removed orderBy to avoid index requirement
+        );
+        
+        const querySnapshot = await getDocs(q);
+        
+        console.log('✅ Found', querySnapshot.size, 'matches for GW' + gameweek);
+        
+        container.innerHTML = '';
+        
+        if (querySnapshot.empty) {
+            container.innerHTML = `
+                <div style="padding:20px;background:#fff3cd;border-radius:8px;text-align:center;">
+                    ⚠️ No matches for Gameweek ${gameweek}<br><br>
+                    💡 Use ◀ ▶ arrows to switch gameweeks<br>
+                    💡 Or add matches from Admin panel
+                </div>
+            `;
+            return;
+        }
+        
+        // Display each match
+        querySnapshot.forEach((docSnap) => {
+            const match = docSnap.data();
+            const matchId = docSnap.id;
+            
+            console.log('Match:', match.homeTeam, 'vs', match.awayTeam);
+            
+            const card = createMatchCard(match, matchId);
+            container.appendChild(card);
+        });
+        
+    } catch (error) {
+        console.error('❌ Error loading matches:', error);
+        
+        container.innerHTML = `
+            <div style="padding:20px;background:#f8d7da;color:#721c24;border-radius:8px;">
+                ❌ Error: ${error.message}<br><br>
+                <strong>Troubleshooting:</strong><br>
+                1. Open in desktop browser<br>
+                2. Press F12 → Console tab<br>
+                3. Check for red errors<br>
+                4. Verify Firestore rules allow read
+            </div>
+        `;
+    }
 }
 
-function showMessage(text, type = 'info') {
-    console.log(`[${type}] ${text}`);
+function createMatchCard(match, matchId) {
+    const card = document.createElement('div');
+    card.className = 'match-card';
+    card.style.cssText = 'background:white;border-radius:12px;padding:15px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);cursor:pointer;';
+    
+    // Handle kickoff time
+    let kickoffDisplay = 'TBD';
+    if (match.kickoffTime) {
+        try {
+            const date = match.kickoffTime.toDate 
+                ? match.kickoffTime.toDate() 
+                : new Date(match.kickoffTime);
+            kickoffDisplay = date.toLocaleDateString() + ' ' + 
+                date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        } catch(e) {
+            kickoffDisplay = 'Date error';
+        }
+    }
+    
+    const isFinished = match.status === 'finished';
+    
+    card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px;color:#666;">
+            <span>📅 ${kickoffDisplay}</span>
+            ${isFinished ? '<span style="color:#2e7d32;font-weight:bold;">✅ Finished</span>' : ''}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-weight:bold;font-size:16px;">
+            <span style="text-align:left;flex:1;">${match.homeTeam}</span>
+            <span style="color:#666;padding:0 10px;">
+                ${isFinished ? `<strong>${match.realHomeScore ?? 0} - ${match.realAwayScore ?? 0}</strong>` : 'VS'}
+            </span>
+            <span style="text-align:right;flex:1;">${match.awayTeam}</span>
+        </div>
+        <div style="margin-top:12px;font-size:13px;color:#666;display:flex;justify-content:space-between;align-items:center;">
+            <span>📍 ${match.stadium || 'TBD'}</span>
+            <span style="background:${isFinished ? '#d4edda' : '#2481cc'};color:${isFinished ? '#155724' : 'white'};padding:4px 12px;border-radius:12px;font-size:11px;font-weight:bold;">
+                ${isFinished ? 'Finished' : 'Predict'}
+            </span>
+        </div>
+    `;
+    
+    // Add click handler for predictions (only if not finished)
+    if (!isFinished) {
+        card.addEventListener('click', () => {
+            if (window.openPredictionModal) {
+                window.openPredictionModal(match, matchId, null);
+            }
+        });
+    }
+    
+    return card;
 }
 
-async function loadInitialData() {
-    await loadGameweeks();
-    await loadMatches(currentGameweekNum);
-    await loadLeaderboard(currentGameweekNum);
-    await loadProfile(userId);
-    initializeAdmin();
-}
-
-// Navigation
-document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const page = btn.dataset.page;
-        
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(`${page}-page`).classList.add('active');
-        
-        if (page === 'matches') loadMatches(currentGameweekNum);
-        if (page === 'leaderboard') loadLeaderboard(currentGameweekNum);
-        if (page === 'profile') loadProfile(userId);
+async function updateAdminGameweekSelectors() {
+    const selectors = [
+        document.getElementById('admin-results-gameweek'),
+        document.getElementById('admin-payments-gameweek')
+    ];
+    
+    selectors.forEach(selector => {
+        if (selector) {
+            selector.innerHTML = '<option value="">Select Gameweek...</option>';
+            allGameweeks.forEach(gw => {
+                const option = document.createElement('option');
+                option.value = gw;
+                option.textContent = `Gameweek ${gw}`;
+                selector.appendChild(option);
+            });
+        }
     });
-});
-
-// Gameweek Navigation
-document.getElementById('prev-gameweek')?.addEventListener('click', () => {
-    if (currentGameweekNum > 1) {
-        currentGameweekNum--;
-        updateGameweekDisplay();
-    }
-});
-
-document.getElementById('next-gameweek')?.addEventListener('click', () => {
-    currentGameweekNum++;
-    updateGameweekDisplay();
-});
-
-function updateGameweekDisplay() {
-    document.getElementById('current-gameweek').textContent = `Gameweek ${currentGameweekNum}`;
-    document.getElementById('leaderboard-gameweek').textContent = `Gameweek ${currentGameweekNum}`;
-    loadMatches(currentGameweekNum);
-    loadLeaderboard(currentGameweekNum);
 }
-
-// Start the app
-initializeApp();
