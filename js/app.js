@@ -1,10 +1,9 @@
 import { db } from './firebase-config.js';
 import { getTelegramUser, initializeUser, createUser, getUserData } from './auth.js';
-import { loadMatches, loadGameweeks, currentGameweek } from './matches.js';
+import { loadMatches, loadGameweeks } from './matches.js';
 import { loadLeaderboard } from './leaderboard.js';
 import { loadProfile } from './profile.js';
 import { initializeAdmin } from './admin.js';
-import { collection, query, where, orderBy, getDocs, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // Initialize Telegram WebApp
 const tg = window.Telegram.WebApp;
@@ -16,98 +15,99 @@ const telegramUser = getTelegramUser();
 const userId = telegramUser?.id || null;
 const username = telegramUser?.username || null;
 
-// Store userId globally for other modules
+// Store userId globally
 window.telegramUserId = userId;
 
 // Global state
 let currentUser = null;
-let currentGameweekNum = 1; // Will be auto-updated
-
-// Auto-detect current gameweek (shows next upcoming or latest)
-async function detectCurrentGameweek() {
-    try {
-        console.log('🔍 Auto-detecting current gameweek...');
-        
-        const now = new Date();
-        
-        // Try to find the next upcoming match
-        const matchesRef = collection(db, 'matches');
-        const upcomingQuery = query(
-            matchesRef,
-            where('status', '==', 'scheduled'),
-            orderBy('kickoffTime', 'asc'),
-            limit(1)
-        );
-        
-        const upcomingSnapshot = await getDocs(upcomingQuery);
-        
-        if (!upcomingSnapshot.empty) {
-            // Found upcoming match - use its gameweek
-            const nextMatch = upcomingSnapshot.docs[0].data();
-            currentGameweekNum = nextMatch.gameweek;
-            console.log(`✅ Found upcoming match in Gameweek ${currentGameweekNum}`);
-            return;
-        }
-        
-        // No upcoming matches - find the latest gameweek with finished matches
-        const allMatchesQuery = query(matchesRef, orderBy('gameweek', 'desc'));
-        const allMatchesSnapshot = await getDocs(allMatchesQuery);
-        
-        if (!allMatchesSnapshot.empty) {
-            const latestMatch = allMatchesSnapshot.docs[0].data();
-            currentGameweekNum = latestMatch.gameweek;
-            console.log(`✅ No upcoming matches, using latest Gameweek ${currentGameweekNum}`);
-            return;
-        }
-        
-        // No matches at all - default to 1
-        currentGameweekNum = 1;
-        console.log('✅ No matches found, defaulting to Gameweek 1');
-        
-    } catch (error) {
-        console.error('❌ Error detecting gameweek:', error);
-        currentGameweekNum = 1; // Fallback
-    }
-}
+let currentGameweekNum = 31; // Set to current gameweek manually
 
 // Initialize App
 async function initializeApp() {
-    // Hide loading screen
-    document.getElementById('loading-screen').classList.remove('active');
-    
-    if (!userId) {
-        // Not opened from Telegram
-        document.getElementById('login-screen').innerHTML = `
+    try {
+        console.log('🚀 Initializing app...');
+        
+        // Hide loading screen immediately
+        document.getElementById('loading-screen').classList.remove('active');
+        
+        if (!userId) {
+            console.warn('⚠️ No Telegram user ID');
+            document.getElementById('login-screen').innerHTML = `
+                <div class="login-container">
+                    <h1>⚽ EPL Predictor</h1>
+                    <p style="color: var(--danger);">⚠️ This app only works inside Telegram!</p>
+                    <p>Please open this app from your Telegram bot.</p>
+                    <button onclick="window.location.reload()" class="btn-primary">Try Again</button>
+                </div>
+            `;
+            document.getElementById('login-screen').classList.add('active');
+            return;
+        }
+
+        console.log('✅ User ID:', userId);
+        
+        // Check if user exists
+        currentUser = await initializeUser(userId);
+        
+        if (!currentUser) {
+            console.log('📝 New user - showing registration');
+            document.getElementById('login-screen').classList.add('active');
+            document.getElementById('login-btn').addEventListener('click', handleRegistration);
+        } else {
+            console.log('✅ Existing user - loading app');
+            document.getElementById('main-app').classList.add('active');
+            
+            // Load all data with error handling
+            try {
+                await loadGameweeks();
+                console.log('✅ Gameweeks loaded');
+            } catch (err) {
+                console.error('❌ Error loading gameweeks:', err);
+            }
+            
+            try {
+                await loadMatches(currentGameweekNum);
+                console.log('✅ Matches loaded for GW' + currentGameweekNum);
+            } catch (err) {
+                console.error('❌ Error loading matches:', err);
+            }
+            
+            try {
+                await loadLeaderboard(currentGameweekNum);
+                console.log('✅ Leaderboard loaded');
+            } catch (err) {
+                console.error('❌ Error loading leaderboard:', err);
+            }
+            
+            try {
+                await loadProfile(userId);
+                console.log('✅ Profile loaded');
+            } catch (err) {
+                console.error('❌ Error loading profile:', err);
+            }
+            
+            try {
+                initializeAdmin();
+                console.log('✅ Admin initialized');
+            } catch (err) {
+                console.error('❌ Error initializing admin:', err);
+            }
+            
+            // Update gameweek display
+            updateGameweekDisplay();
+        }
+        
+    } catch (error) {
+        console.error('🚨 Fatal initialization error:', error);
+        // Show error to user
+        document.getElementById('loading-screen').innerHTML = `
             <div class="login-container">
                 <h1>⚽ EPL Predictor</h1>
-                <p style="color: var(--danger);">⚠️ This app only works inside Telegram!</p>
-                <p>Please open this app from your Telegram bot.</p>
+                <p style="color: var(--danger);">❌ Error loading app</p>
+                <p style="font-size: 12px; color: #666;">${error.message}</p>
                 <button onclick="window.location.reload()" class="btn-primary">Try Again</button>
             </div>
         `;
-        showScreen('login-screen');
-        return;
-    }
-
-    try {
-        // Check if user exists in database
-        currentUser = await initializeUser(userId);
-        
-        // Auto-detect current gameweek BEFORE loading data
-        await detectCurrentGameweek();
-        
-        if (!currentUser) {
-            // New user - show registration screen
-            showScreen('login-screen');
-            document.getElementById('login-btn').addEventListener('click', handleRegistration);
-        } else {
-            // Existing user - show main app
-            showScreen('main-app');
-            loadInitialData();
-        }
-    } catch (error) {
-        console.error('Initialization error:', error);
-        showMessage('Error loading app. Please try again.', 'error');
     }
 }
 
@@ -129,52 +129,14 @@ async function handleRegistration() {
         });
         
         currentUser = await getUserData(userId);
-        showScreen('main-app');
-        loadInitialData();
+        document.getElementById('login-screen').classList.remove('active');
+        document.getElementById('main-app').classList.add('active');
+        initializeApp();
     } catch (error) {
         alert('Error creating profile. Please try again.');
         console.error(error);
     }
 }
-
-function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
-}
-
-function showMessage(text, type = 'info') {
-    console.log(`[${type}] ${text}`);
-}
-
-async function loadInitialData() {
-    console.log(`📅 Loading data for Gameweek ${currentGameweekNum}...`);
-    
-    await loadGameweeks();
-    await loadMatches(currentGameweekNum);
-    await loadLeaderboard(currentGameweekNum);
-    await loadProfile(userId);
-    initializeAdmin();
-    
-    // Update gameweek display
-    updateGameweekDisplay();
-}
-
-// Navigation
-document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const page = btn.dataset.page;
-        
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(`${page}-page`).classList.add('active');
-        
-        if (page === 'matches') loadMatches(currentGameweekNum);
-        if (page === 'leaderboard') loadLeaderboard(currentGameweekNum);
-        if (page === 'profile') loadProfile(userId);
-    });
-});
 
 // Gameweek Navigation
 document.getElementById('prev-gameweek')?.addEventListener('click', () => {
@@ -200,5 +162,23 @@ function updateGameweekDisplay() {
     loadLeaderboard(currentGameweekNum);
 }
 
+// Navigation
+document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const page = btn.dataset.page;
+        
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(`${page}-page`).classList.add('active');
+        
+        if (page === 'matches') loadMatches(currentGameweekNum);
+        if (page === 'leaderboard') loadLeaderboard(currentGameweekNum);
+        if (page === 'profile') loadProfile(userId);
+    });
+});
+
 // Start the app
+console.log(' Starting EPL Predictor...');
 initializeApp();
