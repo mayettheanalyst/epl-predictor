@@ -2,266 +2,138 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Beza's Predict And Win</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPL Predictor</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f7;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .match-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .teams {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        button {
+            background: #2481cc;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <!-- Loading Screen -->
-        <div id="loading-screen" class="loading-screen active">
-            <div class="loading-spinner"></div>
-            <p>Loading...</p>
+    <div class="container">
+        <h1>⚽ EPL Predictor</h1>
+        
+        <div id="status">
+            <p>Testing connection...</p>
         </div>
-
-        <!-- Login Screen -->
-        <div id="login-screen" class="screen">
-            <div class="login-container">
-                <h1>⚽ EPL Predictor</h1>
-                <p>Enter your display name to continue</p>
-                <input type="text" id="display-name-input" placeholder="Your Name" maxlength="20">
-                <select id="favorite-team-select">
-                    <option value="">Favorite Team (Optional)</option>
-                    <option value="Arsenal">Arsenal</option>
-                    <option value="Aston Villa">Aston Villa</option>
-                    <option value="Bournemouth">Bournemouth</option>
-                    <option value="Brentford">Brentford</option>
-                    <option value="Brighton">Brighton</option>
-                    <option value="Burnley">Burnley</option>
-                    <option value="Chelsea">Chelsea</option>
-                    <option value="Crystal Palace">Crystal Palace</option>
-                    <option value="Everton">Everton</option>
-                    <option value="Fulham">Fulham</option>
-                    <option value="Liverpool">Liverpool</option>
-                    <option value="Luton Town">Leeds United</option>
-                    <option value="Man City">Man City</option>
-                    <option value="Man Utd">Man Utd</option>
-                    <option value="Newcastle">Newcastle</option>
-                    <option value="Nott'm Forest">Nott'm Forest</option>
-                    <option value="Sheffield Utd">Sunderland</option>
-                    <option value="Spurs">Spurs</option>
-                    <option value="West Ham">West Ham</option>
-                    <option value="Wolves">Wolves</option>
-                </select>
-                <button id="login-btn" class="btn-primary">Start Playing</button>
-            </div>
-        </div>
-
-        <!-- Main App -->
-        <div id="main-app" class="screen">
-            <!-- Navigation -->
-            <nav class="navbar">
-                <div class="nav-brand">⚽ EPL Predictor</div>
-                <div class="nav-links">
-                    <button class="nav-btn active" data-page="matches">Matches</button>
-                    <button class="nav-btn" data-page="leaderboard">Leaderboard</button>
-                    <button class="nav-btn" data-page="profile">Profile</button>
-                    <button class="nav-btn" data-page="admin">Admin</button>
-                </div>
-            </nav>
-
-            <!-- Matches Page -->
-            <div id="matches-page" class="page active">
-                <div class="page-header">
-                    <div class="gameweek-selector">
-                        <button id="prev-gameweek" class="nav-arrow">◀</button>
-                        <h1 id="current-gameweek">Gameweek 1</h1>
-                        <button id="next-gameweek" class="nav-arrow">▶</button>
-                    </div>
-                    <p>Make your predictions before kickoff!</p>
-                </div>
-                <div id="matches-list" class="matches-container">
-                    <div class="loading">Loading matches...</div>
-                </div>
-            </div>
-
-            <!-- Leaderboard Page -->
-            <div id="leaderboard-page" class="page">
-                <div class="page-header">
-                    <h1>🏆 Leaderboard</h1>
-                    <p id="leaderboard-gameweek">Gameweek 1</p>
-                </div>
-                <div id="leaderboard-list" class="leaderboard-container">
-                    <div class="loading">Loading leaderboard...</div>
-                </div>
-            </div>
-
-            <!-- Profile Page -->
-            <div id="profile-page" class="page">
-                <div class="page-header">
-                    <h1>👤 My Profile</h1>
-                </div>
-                <div class="profile-container">
-                    <div class="profile-card">
-                        <div class="profile-avatar">
-                            <span id="profile-avatar-letter">U</span>
-                        </div>
-                        <h2 id="profile-name">User Name</h2>
-                        <p id="profile-username">@telegram_user</p>
-                        <div class="profile-stats">
-                            <div class="stat">
-                                <span class="stat-value" id="profile-wins">0</span>
-                                <span class="stat-label">Wins</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="profile-losses">0</span>
-                                <span class="stat-label">Losses</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="profile-points">0</span>
-                                <span class="stat-label">Points</span>
-                            </div>
-                        </div>
-                        <div class="profile-info">
-                            <p><strong>Favorite Team:</strong> <span id="profile-favorite-team">Not set</span></p>
-                            <p><strong>Payment Status:</strong> <span id="profile-payment-status" class="status-pending">Not Paid</span></p>
-                            <p><strong>Member Since:</strong> <span id="profile-join-date">-</span></p>
-                        </div>
-                        <button id="edit-profile-btn" class="btn-secondary">Edit Profile</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Admin Page -->
-            <div id="admin-page" class="page">
-                <!-- Admin Login -->
-                <div id="admin-login" class="admin-login">
-                    <h2>🔐 Admin Access</h2>
-                    <p>Enter admin password to continue</p>
-                    <input type="password" id="admin-password-input" placeholder="Admin Password">
-                    <button id="admin-login-btn" class="btn-primary">Login</button>
-                    <div id="admin-login-message" class="message"></div>
-                </div>
-
-                <!-- Admin Dashboard -->
-                <div id="admin-dashboard" class="admin-dashboard" style="display: none;">
-                    <div class="admin-header">
-                        <h1>⚙️ Admin Dashboard</h1>
-                        <button id="admin-logout-btn" class="btn-secondary">Logout</button>
-                    </div>
-
-                    <div class="admin-tabs">
-                        <button class="admin-tab active" data-tab="add-matches">Add Matches</button>
-                        <button class="admin-tab" data-tab="enter-results">Enter Results</button>
-                        <button class="admin-tab" data-tab="payments">Payments</button>
-                    </div>
-
-                    <!-- Add Matches Tab -->
-                    <div id="add-matches-tab" class="admin-tab-content active">
-                        <div class="page-header">
-                            <h2>➕ Add Match Week</h2>
-                            <p>Add all matches for the upcoming gameweek</p>
-                        </div>
-                        <div class="admin-form-group">
-                            <label>Gameweek Number</label>
-                            <input type="number" id="admin-gameweek" min="1" max="38" value="1">
-                        </div>
-                        <div class="admin-form-group">
-                            <label>Season</label>
-                            <input type="text" id="admin-season" value="2024-2025">
-                        </div>
-                        <div id="matches-to-add" class="matches-to-add">
-                            <!-- Match input cards will be added here -->
-                        </div>
-                        <button id="add-match-btn" class="btn-secondary">+ Add Another Match</button>
-                        <button id="save-all-matches" class="btn-primary">💾 Save All Matches</button>
-                        <div id="add-matches-message" class="message"></div>
-                    </div>
-
-                    <!-- Enter Results Tab -->
-                    <div id="enter-results-tab" class="admin-tab-content">
-                        <div class="page-header">
-                            <h2>⚙️ Enter Match Results</h2>
-                            <p>Enter scores for all matches at once</p>
-                        </div>
-                        <div class="admin-form-group">
-                            <label>Select Gameweek</label>
-                            <select id="admin-results-gameweek">
-                                <option value="">Select Gameweek...</option>
-                            </select>
-                        </div>
-                        <div class="admin-grid-container" id="admin-matches-grid">
-                            <div class="message">Select a gameweek to enter results</div>
-                        </div>
-                        <button id="save-all-results" class="btn-primary btn-large">💾 Save All Results & Calculate Points</button>
-                        <div id="admin-results-message" class="message"></div>
-                    </div>
-
-                    <!-- Payments Tab -->
-                    <div id="payments-tab" class="admin-tab-content">
-                        <div class="page-header">
-                            <h2>💰 Payment Tracking</h2>
-                            <p>Mark users as paid</p>
-                        </div>
-                        <div class="admin-form-group">
-                            <label>Select Gameweek</label>
-                            <select id="admin-payments-gameweek">
-                                <option value="">Select Gameweek...</option>
-                            </select>
-                        </div>
-                        <div id="payments-list" class="payments-container">
-                            <div class="message">Select a gameweek to view payments</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Prediction Modal -->
-            <div id="prediction-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 id="modal-match-title">Predict Score</h2>
-                        <button class="close-modal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="score-predictor">
-                            <div class="team-predict">
-                                <span id="modal-home-team" class="team-name">Home</span>
-                                <input type="number" id="pred-home" min="0" max="10" value="0">
-                            </div>
-                            <div class="vs">-</div>
-                            <div class="team-predict">
-                                <input type="number" id="pred-away" min="0" max="10" value="0">
-                                <span id="modal-away-team" class="team-name">Away</span>
-                            </div>
-                        </div>
-                        <button id="submit-prediction" class="btn-primary">Save Prediction</button>
-                        <div id="prediction-message" class="message"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Edit Profile Modal -->
-            <div id="edit-profile-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2>Edit Profile</h2>
-                        <button class="close-modal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>Display Name</label>
-                            <input type="text" id="edit-display-name" maxlength="20">
-                        </div>
-                        <div class="form-group">
-                            <label>Favorite Team</label>
-                            <select id="edit-favorite-team">
-                                <option value="">Not set</option>
-                                <!-- Same teams as login -->
-                            </select>
-                        </div>
-                        <button id="save-profile-btn" class="btn-primary">Save Changes</button>
-                        <div id="profile-message" class="message"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        
+        <div id="matches"></div>
     </div>
 
-    <script type="module" src="js/app.js"></script>
+    <script type="module">
+        // Show we're loading
+        document.getElementById('status').innerHTML = '<p>🔄 Loading...</p>';
+        
+        try {
+            // Import Firebase
+            const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+            const { getFirestore, collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            // YOUR FIREBASE CONFIG - REPLACE WITH YOURS
+            const firebaseConfig = {
+                apiKey: "AIzaSy...",  // ← REPLACE THIS
+                authDomain: "epl-predictor.firebaseapp.com",  // ← REPLACE THIS
+                projectId: "epl-predictor",  // ← REPLACE THIS
+                storageBucket: "epl-predictor.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "1:123456789:web:abc123"
+            };
+            
+            // Initialize
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            
+            document.getElementById('status').innerHTML = '<div class="success">✅ Firebase connected!</div>';
+            
+            // Try to load matches
+            const matchesRef = collection(db, 'matches');
+            const snapshot = await getDocs(matchesRef);
+            
+            document.getElementById('status').innerHTML += `<div class="success">✅ Found ${snapshot.size} matches in database!</div>`;
+            
+            // Display matches
+            const matchesDiv = document.getElementById('matches');
+            
+            if (snapshot.empty) {
+                matchesDiv.innerHTML = '<div class="error">⚠️ No matches found in database</div>';
+            } else {
+                snapshot.forEach(doc => {
+                    const match = doc.data();
+                    const card = document.createElement('div');
+                    card.className = 'match-card';
+                    card.innerHTML = `
+                        <div class="teams">
+                            <span>${match.homeTeam}</span>
+                            <span>VS</span>
+                            <span>${match.awayTeam}</span>
+                        </div>
+                        <div>Gameweek: ${match.gameweek}</div>
+                        <div>Status: ${match.status}</div>
+                    `;
+                    matchesDiv.appendChild(card);
+                });
+            }
+            
+        } catch (error) {
+            document.getElementById('status').innerHTML = `
+                <div class="error">
+                    ❌ Error: ${error.message}<br><br>
+                    <strong>Most likely causes:</strong><br>
+                    1. Firebase config is wrong<br>
+                    2. Firestore rules block access<br>
+                    3. Network connection issue<br><br>
+                    Open in desktop browser and press F12 for details
+                </div>
+            `;
+            console.error('Full error:', error);
+        }
+    </script>
 </body>
 </html>
