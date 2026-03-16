@@ -2,20 +2,25 @@ from telegram import Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import os
-import asyncio
+import logging
 
-# Your bot token from @BotFather
-BOT_TOKEN = "8331894532:AAEo6tq0grT641NBNVnvMyN3u5zWsJb-lXE"
+# Set up logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-# Your web app URL (GitHub Pages URL)
-WEB_APP_URL = "https://mayettheanalyst.github.io/epl-predictor"
+# Get bot token from environment variable (for cloud hosting)
+BOT_TOKEN = os.environ.get("8331894532:AAEo6tq0grT641NBNVnvMyN3u5zWsJb-lXE")
+WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://mayettheanalyst.github.io/epl-predictor")
 
 # Store user IDs for notifications
 user_ids = set()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Save user ID for notifications
-    user_ids.add(update.effective_user.id)
+    """Handle /start command"""
+    user_id = update.effective_user.id
+    user_ids.add(user_id)
     
     keyboard = [
         [InlineKeyboardButton("🎮 Open Prediction Game", web_app=WebAppInfo(url=WEB_APP_URL))]
@@ -32,55 +37,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-async def notify_new_gameweek(context: ContextTypes.DEFAULT_TYPE):
-    """Send notification to all users about new gameweek"""
-    gameweek = context.job.data.get('gameweek', 1)
+def main():
+    """Main function to run the bot"""
+    if not BOT_TOKEN:
+        print("❌ Error: BOT_TOKEN environment variable not set!")
+        return
     
-    keyboard = [
-        [InlineKeyboardButton("🎮 Make Predictions", web_app=WebAppInfo(url=WEB_APP_URL))]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    for user_id in user_ids:
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"⚽ New Gameweek {gameweek} is here!\n\n"
-                     "Make your predictions before the matches start!\n\n"
-                     "💰 Remember to pay the admin if you haven't yet!",
-                reply_markup=reply_markup
-            )
-        except Exception as e:
-            print(f"Error notifying user {user_id}: {e}")
-
-async def notify_matches_starting(context: ContextTypes.DEFAULT_TYPE):
-    """Remind users to submit predictions before matches start"""
-    keyboard = [
-        [InlineKeyboardButton("🎮 Submit Now", web_app=WebAppInfo(url=WEB_APP_URL))]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    for user_id in user_ids:
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text="⏰ Reminder: Matches are starting soon!\n\n"
-                     "Submit your predictions before kickoff!",
-                reply_markup=reply_markup
-            )
-        except Exception as e:
-            print(f"Error notifying user {user_id}: {e}")
-
-async def main():
+    # Build the application
     app = Application.builder().token(BOT_TOKEN).build()
     
+    # Add handlers
     app.add_handler(CommandHandler("start", start))
     
-    # Schedule notifications (examples)
-    # app.job_queue.run_daily(notify_matches_starting, time=datetime.time(hour=10, minute=0))
-    
     print("✅ Bot is running...")
-    await app.run_polling()
+    print(f"🌐 Web App URL: {WEB_APP_URL}")
+    
+    # Run the bot (blocking call)
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
