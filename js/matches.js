@@ -1,7 +1,7 @@
 import { db } from './firebase-config.js';
-import { collection, query, where, orderBy, getDocs, getDoc, doc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-export let currentGameweek = 1;
+export let currentGameweek = 31;
 let allGameweeks = [];
 
 export async function loadGameweeks() {
@@ -16,35 +16,38 @@ export async function loadGameweeks() {
         });
         
         allGameweeks = Array.from(gameweeks).sort((a, b) => a - b);
+        
+        if (allGameweeks.length > 0) {
+            currentGameweek = Math.max(...allGameweeks);
+        }
+        
         updateAdminGameweekSelectors();
         return allGameweeks;
     } catch (error) {
         console.error('Error loading gameweeks:', error);
-        return [];
+        return [31]; // Fallback
     }
 }
 
 export async function loadMatches(gameweek) {
     const container = document.getElementById('matches-list');
     
+    if (!container) {
+        console.error('❌ Matches container not found!');
+        return;
+    }
+    
     container.innerHTML = '<div class="loading">Loading Gameweek ' + gameweek + '...</div>';
     
     try {
-        console.log('🔍 Attempting to load matches for GW' + gameweek);
-        
         const matchesRef = collection(db, 'matches');
-        
-        // Try query with orderBy
         const q = query(
             matchesRef,
             where('gameweek', '==', parseInt(gameweek)),
             orderBy('kickoffTime', 'asc')
         );
         
-        console.log('📊 Running query...');
         const querySnapshot = await getDocs(q);
-        
-        console.log('✅ Query successful! Found', querySnapshot.size, 'matches');
         
         container.innerHTML = '';
         
@@ -58,61 +61,31 @@ export async function loadMatches(gameweek) {
             return;
         }
         
-        const userId = window.telegramUserId;
-        console.log('User ID:', userId);
-        
         querySnapshot.forEach((docSnap) => {
             const match = docSnap.data();
             const matchId = docSnap.id;
             
-            console.log('Loading match:', match.homeTeam, 'vs', match.awayTeam);
-            
-            const card = createMatchCard(match, matchId, null);
+            const card = createMatchCard(match, matchId);
             container.appendChild(card);
         });
         
     } catch (error) {
-        console.error('❌ Full error:', error);
-        
-        let errorMessage = error.message;
-        let solution = '';
-        
-        // Check for specific errors
-        if (error.message.includes('index')) {
-            errorMessage = 'Missing Firestore Index';
-            solution = 'Click the link in browser console to create the index';
-        } else if (error.message.includes('permission')) {
-            errorMessage = 'Permission Denied';
-            solution = 'Update Firestore Rules to allow read access';
-        } else if (error.message.includes('kickoffTime')) {
-            errorMessage = 'Invalid kickoffTime field';
-            solution = 'Check that kickoffTime is a timestamp in Firebase';
-        }
+        console.error('❌ Error loading matches:', error);
         
         container.innerHTML = `
-            <div class="message error show" style="padding: 20px; text-align: left;">
-                <strong style="color: #721c24; display: block; margin-bottom: 10px; font-size: 16px;">
-                    ❌ Error Loading Matches
-                </strong>
-                <div style="background: #fff; padding: 15px; border-radius: 8px; margin: 10px 0; font-family: monospace; font-size: 12px;">
-                    ${errorMessage}
-                </div>
-                <div style="margin-top: 10px; font-size: 14px;">
-                    <strong>💡 Solution:</strong><br>
-                    ${solution || 'Check browser console for details'}
-                </div>
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f5c6cb; font-size: 13px;">
-                    <strong>Debug Info:</strong><br>
-                    Gameweek: ${gameweek}<br>
-                    Error Code: ${error.code || 'N/A'}<br>
-                    <small>To see full error details, open this app in a desktop browser and press F12</small>
-                </div>
+            <div class="message error show">
+                ❌ Error loading matches<br>
+                <small>${error.message}</small><br><br>
+                <strong>Common fixes:</strong><br>
+                1. Check Firestore Rules allow read access<br>
+                2. Check browser console for details<br>
+                3. Verify match data in Firebase
             </div>
         `;
     }
 }
 
-function createMatchCard(match, matchId, prediction) {
+function createMatchCard(match, matchId) {
     const card = document.createElement('div');
     card.className = 'match-card';
     
@@ -154,32 +127,12 @@ function createMatchCard(match, matchId, prediction) {
     if (!isFinished && !hasStarted) {
         card.addEventListener('click', () => {
             if (window.openPredictionModal) {
-                window.openPredictionModal(match, matchId, prediction);
+                window.openPredictionModal(match, matchId, null);
             }
         });
     }
     
     return card;
-}
-
-export async function getUserPrediction(userId, matchId) {
-    try {
-        if (!userId) return null;
-        const predictionsRef = collection(db, 'predictions');
-        const q = query(
-            predictionsRef,
-            where('userId', '==', userId),
-            where('matchId', '==', matchId)
-        );
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            return querySnapshot.docs[0].data();
-        }
-        return null;
-    } catch (error) {
-        console.error('Error getting prediction:', error);
-        return null;
-    }
 }
 
 async function updateAdminGameweekSelectors() {
