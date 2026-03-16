@@ -8,7 +8,7 @@ import asyncio
 BOT_TOKEN = "8331894532:AAEo6tq0grT641NBNVnvMyN3u5zWsJb-lXE"
 
 # Your web app URL (GitHub Pages URL)
-WEB_APP_URL = "https://your-username.github.io/epl-predictor"
+WEB_APP_URL = "https://mayettheanalyst.github.io/epl-predictor"
 
 # Store user IDs for notifications
 user_ids = set()
