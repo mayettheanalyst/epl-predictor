@@ -4,6 +4,7 @@ import { loadMatches, loadGameweeks, currentGameweek } from './matches.js';
 import { loadLeaderboard } from './leaderboard.js';
 import { loadProfile } from './profile.js';
 import { initializeAdmin } from './admin.js';
+import { collection, query, where, orderBy, getDocs, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // Initialize Telegram WebApp
 const tg = window.Telegram.WebApp;
@@ -20,7 +21,54 @@ window.telegramUserId = userId;
 
 // Global state
 let currentUser = null;
-let currentGameweekNum = 1;
+let currentGameweekNum = 1; // Will be auto-updated
+
+// Auto-detect current gameweek (shows next upcoming or latest)
+async function detectCurrentGameweek() {
+    try {
+        console.log('🔍 Auto-detecting current gameweek...');
+        
+        const now = new Date();
+        
+        // Try to find the next upcoming match
+        const matchesRef = collection(db, 'matches');
+        const upcomingQuery = query(
+            matchesRef,
+            where('status', '==', 'scheduled'),
+            orderBy('kickoffTime', 'asc'),
+            limit(1)
+        );
+        
+        const upcomingSnapshot = await getDocs(upcomingQuery);
+        
+        if (!upcomingSnapshot.empty) {
+            // Found upcoming match - use its gameweek
+            const nextMatch = upcomingSnapshot.docs[0].data();
+            currentGameweekNum = nextMatch.gameweek;
+            console.log(`✅ Found upcoming match in Gameweek ${currentGameweekNum}`);
+            return;
+        }
+        
+        // No upcoming matches - find the latest gameweek with finished matches
+        const allMatchesQuery = query(matchesRef, orderBy('gameweek', 'desc'));
+        const allMatchesSnapshot = await getDocs(allMatchesQuery);
+        
+        if (!allMatchesSnapshot.empty) {
+            const latestMatch = allMatchesSnapshot.docs[0].data();
+            currentGameweekNum = latestMatch.gameweek;
+            console.log(`✅ No upcoming matches, using latest Gameweek ${currentGameweekNum}`);
+            return;
+        }
+        
+        // No matches at all - default to 1
+        currentGameweekNum = 1;
+        console.log('✅ No matches found, defaulting to Gameweek 1');
+        
+    } catch (error) {
+        console.error('❌ Error detecting gameweek:', error);
+        currentGameweekNum = 1; // Fallback
+    }
+}
 
 // Initialize App
 async function initializeApp() {
@@ -44,6 +92,9 @@ async function initializeApp() {
     try {
         // Check if user exists in database
         currentUser = await initializeUser(userId);
+        
+        // Auto-detect current gameweek BEFORE loading data
+        await detectCurrentGameweek();
         
         if (!currentUser) {
             // New user - show registration screen
@@ -96,11 +147,16 @@ function showMessage(text, type = 'info') {
 }
 
 async function loadInitialData() {
+    console.log(`📅 Loading data for Gameweek ${currentGameweekNum}...`);
+    
     await loadGameweeks();
     await loadMatches(currentGameweekNum);
     await loadLeaderboard(currentGameweekNum);
     await loadProfile(userId);
     initializeAdmin();
+    
+    // Update gameweek display
+    updateGameweekDisplay();
 }
 
 // Navigation
@@ -134,8 +190,12 @@ document.getElementById('next-gameweek')?.addEventListener('click', () => {
 });
 
 function updateGameweekDisplay() {
-    document.getElementById('current-gameweek').textContent = `Gameweek ${currentGameweekNum}`;
-    document.getElementById('leaderboard-gameweek').textContent = `Gameweek ${currentGameweekNum}`;
+    const gwTitle = document.getElementById('current-gameweek');
+    const lbTitle = document.getElementById('leaderboard-gameweek');
+    
+    if (gwTitle) gwTitle.textContent = `Gameweek ${currentGameweekNum}`;
+    if (lbTitle) lbTitle.textContent = `Gameweek ${currentGameweekNum}`;
+    
     loadMatches(currentGameweekNum);
     loadLeaderboard(currentGameweekNum);
 }
