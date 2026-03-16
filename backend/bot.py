@@ -6,18 +6,11 @@ import logging
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.DEBUG
+    level=logging.INFO
 )
 
-# Get environment variables
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+BOT_TOKEN = os.environ.get("8331894532:AAEo6tq0grT641NBNVnvMyN3u5zWsJb-lXE")
 WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://mayettheanalyst.github.io/epl-predictor")
-
-# Debug: Print what we received (token will be hidden)
-print(f"🔍 BOT_TOKEN found: {'YES' if BOT_TOKEN else 'NO'}")
-print(f"🔍 BOT_TOKEN length: {len(BOT_TOKEN) if BOT_TOKEN else 0}")
-print(f"🔍 WEB_APP_URL: {WEB_APP_URL}")
-
 user_ids = set()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -26,22 +19,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        f"⚽ Welcome to EPL Predictor!\n\nClick below to play:",
+        f"⚽ Welcome to EPL Predictor, {update.effective_user.first_name}!\n\n"
+        "Click the button below to start playing:",
         reply_markup=reply_markup
     )
 
-def main():
+async def main():
     if not BOT_TOKEN:
-        print("❌ FATAL: BOT_TOKEN is still not set!")
-        print("💡 Check Render Environment tab - variable name must be EXACTLY 'BOT_TOKEN'")
+        logging.error("BOT_TOKEN not set!")
         return
     
-    print("✅ BOT_TOKEN is set! Starting bot...")
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
+    # Build app with new API
+    application = Application.builder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
     
-    print("✅ Bot is running...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    logging.info("✅ Bot is running...")
+    
+    # Start polling (new async pattern)
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Keep the bot running
+    await application.stop()
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())
