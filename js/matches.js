@@ -1,58 +1,95 @@
 import { db } from './firebase-config.js';
-import { collection, query, where, orderBy, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 export async function loadGameweeks() {
-    return [31]; // Simplified
+    return [31];
 }
 
 export async function loadMatches(gameweek) {
     const container = document.getElementById('matches-list');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Container not found');
+        return;
+    }
     
-    container.innerHTML = '<p style="text-align:center;padding:20px;">Loading...</p>';
+    container.innerHTML = '<div style="padding:20px;text-align:center;">Loading matches...</div>';
     
     try {
+        console.log('🔍 Querying ALL matches (no filters)...');
+        
+        // NO filters, NO orderBy - just get everything
         const matchesRef = collection(db, 'matches');
+        const snapshot = await getDocs(matchesRef);
         
-        // Try WITHOUT orderBy first
-        const q = query(
-            matchesRef,
-            where('gameweek', '==', 31)  // Hardcode to 31 for testing
-        );
-        
-        console.log('🔍 Querying for GW31...');
-        const snapshot = await getDocs(q);
-        
-        console.log('📊 Found:', snapshot.size, 'matches');
+        console.log('✅ Query successful! Total matches:', snapshot.size);
         
         container.innerHTML = '';
         
         if (snapshot.empty) {
-            // Try querying ALL matches to see what's there
-            const allMatches = await getDocs(matchesRef);
-            console.log('Total matches in DB:', allMatches.size);
-            allMatches.forEach(doc => {
-                console.log('Match:', doc.data());
-            });
-            
             container.innerHTML = `
-                <div style="padding: 20px; background: #fff3cd; border-radius: 8px;">
-                    ⚠️ No matches for GW31<br><br>
-                    Total matches in database: ${allMatches.size}<br><br>
-                    <small>Check console (F12) to see all matches</small>
+                <div style="padding:20px;background:#fff3cd;border-radius:8px;text-align:center;">
+                    ⚠️ Database is empty - No matches found<br><br>
+                    Add matches from Admin panel
                 </div>
             `;
             return;
         }
         
-        // Display matches...
-        snapshot.forEach(doc => {
-            const match = doc.data();
-            // ... rest of display code
+        // Show count
+        const countDiv = document.createElement('div');
+        countDiv.style.cssText = 'padding:10px;background:#d4edda;border-radius:8px;margin-bottom:15px;text-align:center;';
+        countDiv.innerHTML = `✅ Found ${snapshot.size} match(es) in database`;
+        container.appendChild(countDiv);
+        
+        // Display all matches
+        snapshot.forEach((docSnap, index) => {
+            const match = docSnap.data();
+            const matchId = docSnap.id;
+            
+            console.log(`\n📊 Match #${index + 1}:`);
+            console.log('  ID:', matchId);
+            console.log('  Home:', match.homeTeam);
+            console.log('  Away:', match.awayTeam);
+            console.log('  Gameweek:', match.gameweek, '(type:', typeof match.gameweek + ')');
+            console.log('  Status:', match.status);
+            console.log('  Kickoff:', match.kickoffTime);
+            console.log('---');
+            
+            const card = document.createElement('div');
+            card.style.cssText = 'background:white;border-radius:12px;padding:15px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);';
+            
+            let kickoffDisplay = 'TBD';
+            if (match.kickoffTime) {
+                try {
+                    const date = match.kickoffTime.toDate ? match.kickoffTime.toDate() : new Date(match.kickoffTime);
+                    kickoffDisplay = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                } catch(e) {
+                    kickoffDisplay = 'Invalid date';
+                }
+            }
+            
+            card.innerHTML = `
+                <div style="font-weight:bold;margin-bottom:10px;">
+                    ${match.homeTeam || 'Unknown'} vs ${match.awayTeam || 'Unknown'}
+                </div>
+                <div style="font-size:13px;color:#666;">
+                    <div>📅 ${kickoffDisplay}</div>
+                    <div>🏆 Gameweek: ${match.gameweek}</div>
+                    <div>📍 ${match.stadium || 'TBD'}</div>
+                    <div>📊 Status: ${match.status || 'unknown'}</div>
+                </div>
+            `;
+            
+            container.appendChild(card);
         });
         
     } catch (error) {
-        console.error('Error:', error);
-        container.innerHTML = `<div style="padding:20px;background:#f8d7da;border-radius:8px;">❌ ${error.message}</div>`;
+        console.error('❌ Error loading matches:', error);
+        container.innerHTML = `
+            <div style="padding:20px;background:#f8d7da;color:#721c24;border-radius:8px;">
+                ❌ Error: ${error.message}<br><br>
+                <strong>Check browser console (F12) for details</strong>
+            </div>
+        `;
     }
 }
