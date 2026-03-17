@@ -11,6 +11,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             background: #f2f2f7;
             padding: 20px;
+            padding-bottom: 80px;
         }
         .header {
             background: #2481cc;
@@ -21,7 +22,7 @@
             text-align: center;
         }
         .header h1 { font-size: 24px; margin-bottom: 5px; }
-        .match-card {
+        .match-card, .user-card {
             background: white;
             border-radius: 12px;
             padding: 15px;
@@ -46,8 +47,7 @@
             background: #f8d7da;
             color: #721c24;
             padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
+            border-radius: 8px;            margin: 10px 0;
         }
         .success {
             background: #d4edda;
@@ -56,164 +56,418 @@
             border-radius: 8px;
             margin: 10px 0;
         }
-        .loading { text-align: center; padding: 40px; color: white; }
         .nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            overflow-x: auto;
+            padding: 10px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            gap: 5px;
         }
         .nav button {
-            background: rgba(255,255,255,0.2);
-            color: white;
+            flex: 1;
+            background: #f2f2f7;
+            color: #666;
             border: none;
-            padding: 10px 15px;
+            padding: 12px;
             border-radius: 8px;
             cursor: pointer;
-            white-space: nowrap;
+            font-weight: 600;
+            transition: all 0.3s;
         }
         .nav button.active {
-            background: white;
+            background: #2481cc;
+            color: white;
+        }
+        .page { display: none; }
+        .page.active { display: block; }
+        input, select, button.primary {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button.primary {
+            background: #2481cc;
+            color: white;
+            border: none;
+            cursor: pointer;            font-weight: 600;
+        }
+        button.primary:hover { background: #1a6aa8; }
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .rank {
+            font-weight: bold;
+            font-size: 18px;
             color: #2481cc;
+            width: 40px;
+        }
+        .rank.gold { color: #ffd700; }
+        .rank.silver { color: #c0c0c0; }
+        .rank.bronze { color: #cd7f32; }
+        .points {
+            font-weight: bold;
+            color: #2481cc;
+            font-size: 18px;
         }
     </style>
 </head>
 <body>
+    <!-- Header -->
     <div class="header">
         <h1>⚽ EPL Predictor</h1>
-        <div id="status">Initializing...</div>
+        <div id="status">🔄 Loading...</div>
     </div>
-    
-    <div class="nav">
-        <button class="active" onclick="showPage('matches')">Matches</button>
-        <button onclick="showPage('leaderboard')">Leaderboard</button>
-        <button onclick="showPage('profile')">Profile</button>
-        <button onclick="showPage('admin')">Admin</button>
-    </div>
-    
-    <div id="matches-page">
-        <h2 style="text-align:center;margin-bottom:15px;">Gameweek 31</h2>
+
+    <!-- MATCHES PAGE -->
+    <div id="matches-page" class="page active">
+        <h2 style="text-align:center;margin-bottom:15px;">
+            <button onclick="changeGameweek(-1)" style="width:40px;margin-right:10px;">◀</button>
+            Gameweek <span id="current-gw">31</span>
+            <button onclick="changeGameweek(1)" style="width:40px;margin-left:10px;">▶</button>
+        </h2>
         <div id="matches-container"></div>
     </div>
-    
-    <div id="leaderboard-page" style="display:none;">
-        <h2>🏆 Leaderboard</h2>
-        <p>Coming soon...</p>
+
+    <!-- LEADERBOARD PAGE -->
+    <div id="leaderboard-page" class="page">
+        <h2 style="margin-bottom:15px;">🏆 Leaderboard - GW<span id="lb-gw">31</span></h2>
+        <div id="leaderboard-container"></div>
     </div>
-    
-    <div id="profile-page" style="display:none;">
-        <h2>👤 Profile</h2>
-        <p>Coming soon...</p>
+
+    <!-- PROFILE PAGE -->    <div id="profile-page" class="page">
+        <h2 style="margin-bottom:15px;">👤 Your Profile</h2>
+        <div id="profile-container"></div>
     </div>
-    
-    <div id="admin-page" style="display:none;">
-        <h2>⚙️ Admin</h2>
-        <p>Coming soon...</p>
+
+    <!-- ADMIN PAGE -->
+    <div id="admin-page" class="page">
+        <h2 style="margin-bottom:15px;">⚙️ Admin Panel</h2>
+        <div id="admin-login">
+            <input type="password" id="admin-password" placeholder="Enter admin password">
+            <button class="primary" onclick="adminLogin()">Login</button>
+        </div>
+        <div id="admin-panel" style="display:none;">
+            <button class="primary" onclick="showAdminSection('add')" style="margin-bottom:10px;">➕ Add Matches</button>
+            <button class="primary" onclick="showAdminSection('results')" style="margin-bottom:10px;">📊 Enter Results</button>
+            <button class="primary" onclick="adminLogout()" style="background:#dc3545;">Logout</button>
+            
+            <div id="admin-add-matches" style="display:none;margin-top:20px;">
+                <h3>Add New Matches</h3>
+                <input type="number" id="add-gw" placeholder="Gameweek" value="31">
+                <input type="text" id="add-home" placeholder="Home Team">
+                <input type="text" id="add-away" placeholder="Away Team">
+                <input type="text" id="add-stadium" placeholder="Stadium">
+                <input type="datetime-local" id="add-kickoff" placeholder="Kickoff Time">
+                <button class="primary" onclick="addMatch()">Add Match</button>
+            </div>
+            
+            <div id="admin-results" style="display:none;margin-top:20px;">
+                <h3>Enter Results</h3>
+                <select id="results-gw"><option value="31">Gameweek 31</option></select>
+                <div id="results-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="nav">
+        <button class="active" onclick="showPage('matches')">⚽ Matches</button>
+        <button onclick="showPage('leaderboard')">🏆 Leaderboard</button>
+        <button onclick="showPage('profile')">👤 Profile</button>
+        <button onclick="showPage('admin')">⚙️ Admin</button>
     </div>
 
     <script type="module">
-        // Show we're starting
-        document.getElementById('status').innerHTML = '🔄 Connecting to Firebase...';
+        // Firebase setup
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+        const { getFirestore, collection, getDocs, addDoc, query, where, orderBy, doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         
-        try {
-            // Import Firebase
-            const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-            const { getFirestore, collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-            
-            // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
-            const firebaseConfig = {
-                apiKey: "AIzaSyAaqYXuYEg_pIPMHfbz7i1jcVCgeGJ_4zs",
-                authDomain: "epl-predictor-ae53f.firebaseapp.com",
-                projectId: "epl-predictor-ae53f",
-                storageBucket: "epl-predictor-ae53f.firebasestorage.app",
-                messagingSenderId: "956744043344",
-                appId: "1:956744043344:web:79a7bdedc55d14eec43a55"
-            };
-            
-            // Initialize
-            const app = initializeApp(firebaseConfig);
-            const db = getFirestore(app);
-            
-            document.getElementById('status').innerHTML = '✅ Connected! Loading matches...';
-            
-            // Load ALL matches (no filters)
-            const matchesRef = collection(db, 'matches');
-            const snapshot = await getDocs(matchesRef);
-            
-            const container = document.getElementById('matches-container');
-            
-            if (snapshot.empty) {
-                container.innerHTML = `
-                    <div class="error">
-                        ⚠️ No matches found in database<br><br>
-                        <strong>Add matches:</strong><br>
-                        1. Go to Admin tab<br>
-                        2. Login with password<br>
-                        3. Add your fixtures
-                    </div>
-                `;
-            } else {
-                document.getElementById('status').innerHTML = `✅ Found ${snapshot.size} match(es)`;
-                
-                snapshot.forEach(doc => {
-                    const match = doc.data();
-                    
-                    const card = document.createElement('div');
-                    card.className = 'match-card';
-                    
-                    let dateStr = 'TBD';
-                    if (match.kickoffTime) {
-                        try {
-                            const d = match.kickoffTime.toDate 
-                                ? match.kickoffTime.toDate() 
-                                : new Date(match.kickoffTime);
-                            dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                        } catch(e) {
-                            dateStr = 'Invalid date';
-                        }
-                    }
-                    
-                    card.innerHTML = `
-                        <div class="teams">
-                            <span>${match.homeTeam || 'Home'}</span>
-                            <span>VS</span>
-                            <span>${match.awayTeam || 'Away'}</span>
-                        </div>
-                        <div class="info">
-                            <span>📅 ${dateStr}</span>
-                            <span>🏆 GW${match.gameweek || '?'}</span>
-                        </div>
-                        <div class="info" style="margin-top:5px;">
-                            <span>📍 ${match.stadium || 'TBD'}</span>
-                            <span>${match.status || 'scheduled'}</span>
-                        </div>
-                    `;
-                    
-                    container.appendChild(card);
-                });
-            }
-            
-        } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('status').innerHTML = `
-                <div class="error" style="text-align:left;">
-                    ❌ Error: ${error.message}<br><br>
-                    <strong>Common fixes:</strong><br>
-                    1. Check Firebase config is correct<br>
-                    2. Check Firestore rules allow read<br>
-                    3. Open in desktop browser & press F12
-                </div>
-            `;
-        }
+        // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {            
+            apiKey: "AIzaSy...",  // ← YOUR CONFIG HERE
+            authDomain: "epl-predictor.firebaseapp.com",
+            projectId: "epl-predictor",
+            storageBucket: "epl-predictor.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123"
+        };
         
-        // Simple page navigation
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Global state
+        let currentGameweek = 31;
+        let currentUser = null;
+        let isAdmin = false;
+        
+        // Get Telegram user
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        const user = tg.initDataUnsafe?.user;
+        const userId = user?.id?.toString() || null;
+        window.telegramUserId = userId;
+        
+        document.getElementById('status').innerHTML = '✅ Connected!';
+        
+        // Navigation
         window.showPage = function(pageName) {
-            ['matches', 'leaderboard', 'profile', 'admin'].forEach(p => {
-                document.getElementById(p + '-page').style.display = p === pageName ? 'block' : 'none';
-            });
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageName + '-page').classList.add('active');
             document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
+            
+            if (pageName === 'matches') loadMatches();
+            if (pageName === 'leaderboard') loadLeaderboard();
+            if (pageName === 'profile') loadProfile();
         };
-    </script>
-</body>
-</html>
+        
+        window.changeGameweek = function(delta) {
+            currentGameweek += delta;
+            if (currentGameweek < 1) currentGameweek = 1;
+            document.getElementById('current-gw').textContent = currentGameweek;
+            document.getElementById('lb-gw').textContent = currentGameweek;
+            loadMatches();
+        };
+        
+        // Load Matches
+        async function loadMatches() {
+            const container = document.getElementById('matches-container');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                        try {
+                const matchesRef = collection(db, 'matches');
+                const q = query(matchesRef, where('gameweek', '==', currentGameweek));
+                const snapshot = await getDocs(q);
+                
+                container.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No matches for this gameweek</div>';
+                    return;
+                }
+                
+                snapshot.forEach(docSnap => {
+                    const match = docSnap.data();
+                    const card = createMatchCard(match);
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function createMatchCard(match) {
+            const div = document.createElement('div');
+            div.className = 'match-card';
+            
+            let dateStr = 'TBD';
+            if (match.kickoffTime) {
+                const d = match.kickoffTime.toDate ? match.kickoffTime.toDate() : new Date(match.kickoffTime);
+                dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            }
+            
+            const isFinished = match.status === 'finished';
+            
+            div.innerHTML = `
+                <div class="teams">
+                    <span>${match.homeTeam}</span>
+                    <span>${isFinished ? `${match.realHomeScore || 0} - ${match.realAwayScore || 0}` : 'VS'}</span>
+                    <span>${match.awayTeam}</span>
+                </div>
+                <div class="info">
+                    <span>📅 ${dateStr}</span>
+                    <span>🏆 GW${match.gameweek}</span>
+                </div>
+                <div class="info" style="margin-top:5px;">
+                    <span>📍 ${match.stadium || 'TBD'}</span>
+                    <span style="color:${isFinished ? '#2e7d32' : '#2481cc'}">${isFinished ? '✅ Finished' : '🔮 Predict'}</span>
+                </div>
+            `;
+                        if (!isFinished) {
+                div.style.cursor = 'pointer';
+                div.onclick = () => openPredictionModal(match);
+            }
+            
+            return div;
+        }
+        
+        // Load Leaderboard
+        window.loadLeaderboard = async function() {
+            const container = document.getElementById('leaderboard-container');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+            
+            try {
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, orderBy('totalPoints', 'desc'));
+                const snapshot = await getDocs(q);
+                
+                container.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No users yet</div>';
+                    return;
+                }
+                
+                let rank = 1;
+                snapshot.forEach(docSnap => {
+                    const userData = docSnap.data();
+                    const div = document.createElement('div');
+                    div.className = 'leaderboard-item';
+                    
+                    let rankClass = '';
+                    if (rank === 1) rankClass = 'gold';
+                    else if (rank === 2) rankClass = 'silver';
+                    else if (rank === 3) rankClass = 'bronze';
+                    
+                    div.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:15px;">
+                            <div class="rank ${rankClass}">${rank}</div>
+                            <div>
+                                <div style="font-weight:bold;">${userData.displayName || 'User'}</div>
+                                <div style="font-size:12px;color:#666;">W: ${userData.totalWins || 0} | L: ${userData.totalLosses || 0}</div>
+                            </div>
+                        </div>
+                        <div class="points">${userData.totalPoints || 0} pts</div>
+                    `;
+                    
+                    container.appendChild(div);
+                    rank++;
+                });            } catch (error) {
+                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        };
+        
+        // Load Profile
+        window.loadProfile = async function() {
+            if (!userId) {
+                document.getElementById('profile-container').innerHTML = '<div class="error">Not logged in</div>';
+                return;
+            }
+            
+            const container = document.getElementById('profile-container');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+            
+            try {
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, where('userId', '==', userId));
+                const snapshot = await getDocs(q);
+                
+                if (snapshot.empty) {
+                    // Register new user
+                    const name = user?.first_name || 'User';
+                    await addDoc(usersRef, {
+                        userId: userId,
+                        displayName: name,
+                        username: user?.username || null,
+                        favoriteTeam: '',
+                        totalPoints: 0,
+                        totalWins: 0,
+                        totalLosses: 0,
+                        isPaid: false,
+                        createdAt: new Date()
+                    });
+                    container.innerHTML = `<div class="success">✅ Profile created!<br>Welcome, ${name}!</div>`;
+                    return;
+                }
+                
+                const userData = snapshot.docs[0].data();
+                
+                container.innerHTML = `
+                    <div class="match-card">
+                        <h3 style="margin-bottom:15px;">👤 ${userData.displayName || 'User'}</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;">
+                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                                <div style="font-size:24px;font-weight:bold;color:#2481cc;">${userData.totalPoints || 0}</div>
+                                <div style="font-size:12px;color:#666;">Total Points</div>
+                            </div>
+                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                                <div style="font-size:24px;font-weight:bold;color:#2e7d32;">${userData.totalWins || 0}</div>                                <div style="font-size:12px;color:#666;">Wins</div>
+                            </div>
+                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                                <div style="font-size:24px;font-weight:bold;color:#dc3545;">${userData.totalLosses || 0}</div>
+                                <div style="font-size:12px;color:#666;">Losses</div>
+                            </div>
+                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                                <div style="font-size:24px;font-weight:bold;">${userData.isPaid ? '✅' : '❌'}</div>
+                                <div style="font-size:12px;color:#666;">Payment Status</div>
+                            </div>
+                        </div>
+                        ${userData.favoriteTeam ? `<div style="margin-top:15px;text-align:center;"><strong>Favorite Team:</strong> ${userData.favoriteTeam}</div>` : ''}
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        };
+        
+        // Admin Functions
+        window.adminLogin = function() {
+            const password = document.getElementById('admin-password').value;
+            if (password === 'admin123') {  // Change this!
+                isAdmin = true;
+                document.getElementById('admin-login').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+            } else {
+                alert('Wrong password!');
+            }
+        };
+        
+        window.adminLogout = function() {
+            isAdmin = false;
+            document.getElementById('admin-login').style.display = 'block';
+            document.getElementById('admin-panel').style.display = 'none';
+            document.getElementById('admin-password').value = '';
+        };
+        
+        window.showAdminSection = function(section) {
+            document.getElementById('admin-add-matches').style.display = section === 'add' ? 'block' : 'none';
+            document.getElementById('admin-results').style.display = section === 'results' ? 'block' : 'none';
+            
+            if (section === 'results') loadResultsSection();
+        };
+        
+        window.addMatch = async function() {
+            const gw = parseInt(document.getElementById('add-gw').value);
+            const home = document.getElementById('add-home').value;
+            const away = document.getElementById('add-away').value;
+            const stadium = document.getElementById('add-stadium').value;            const kickoff = document.getElementById('add-kickoff').value;
+            
+            if (!home || !away || !kickoff) {
+                alert('Please fill all required fields');
+                return;
+            }
+            
+            try {
+                await addDoc(collection(db, 'matches'), {
+                    homeTeam: home,
+                    awayTeam: away,
+                    stadium: stadium,
+                    gameweek: gw,
+                    kickoffTime: new Date(kickoff),
+                    status: 'scheduled',
+                    realHomeScore: null,
+                    realAwayScore: null,
+                    createdAt: new Date()
+                });
+                
+                alert('✅ Match added!');
+                document.getElementById('add-home').value = '';
+                document.getElementById('add-away').value = '';
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+        
+        async function loadResultsSection() {
+            const container = document.getElementById('results-container');
+            container.innerHTM
