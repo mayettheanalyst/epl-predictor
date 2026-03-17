@@ -48,13 +48,6 @@
             padding: 15px;
             border-radius: 8px;
             margin: 10px 0;        }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
         .warning {
             background: #fff3cd;
             color: #856404;
@@ -90,6 +83,22 @@
         .page { display: none; }
         .page.active { display: block; }
         .loading { text-align: center; padding: 40px; color: #666; }
+        button.primary {
+            background: #2481cc;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin: 5px 0;            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -97,7 +106,7 @@
         <h1>⚽ EPL Predictor</h1>
         <div id="status">🔄 Initializing...</div>
     </div>
-    <!-- MATCHES PAGE -->
+
     <div id="matches-page" class="page active">
         <h2 style="text-align:center;margin-bottom:15px;">
             <button onclick="changeGW(-1)" style="width:40px;margin-right:10px;">◀</button>
@@ -107,116 +116,89 @@
         <div id="matches-list"></div>
     </div>
 
-    <!-- LEADERBOARD PAGE -->
     <div id="leaderboard-page" class="page">
         <h2 style="margin-bottom:15px;">🏆 Leaderboard</h2>
         <div id="leaderboard-list"></div>
     </div>
 
-    <!-- PROFILE PAGE -->
     <div id="profile-page" class="page">
         <h2 style="margin-bottom:15px;">👤 Profile</h2>
         <div id="profile-list"></div>
     </div>
 
-    <!-- ADMIN PAGE -->
     <div id="admin-page" class="page">
         <h2 style="margin-bottom:15px;">⚙️ Admin Panel</h2>
-        <div id="admin-content">
-            <input type="password" id="admin-pass" placeholder="Enter password (admin123)">
-            <button onclick="checkAdmin()" style="background:#2481cc;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin:5px 0;">Login</button>
+        <div id="admin-login">
+            <input type="password" id="admin-pass" placeholder="Enter password">
+            <button class="primary" onclick="checkAdmin()">Login</button>
         </div>
         <div id="admin-panel" style="display:none;">
-            <button onclick="showAdmin('add')" style="background:#2481cc;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin:5px 0;">➕ Add Matches</button>
-            <button onclick="showAdmin('results')" style="background:#2481cc;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin:5px 0;">📊 Enter Results</button>
+            <button class="primary" onclick="showAdmin('add')">➕ Add Matches</button>
+            <button class="primary" onclick="showAdmin('results')">📊 Enter Results</button>
+            <button class="primary" onclick="logoutAdmin()" style="background:#dc3545;">Logout</button>
+            
             <div id="admin-add" style="display:none;margin-top:20px;">
                 <input type="number" id="a-gw" placeholder="Gameweek" value="31">
                 <input type="text" id="a-home" placeholder="Home Team">
                 <input type="text" id="a-away" placeholder="Away Team">
                 <input type="text" id="a-stadium" placeholder="Stadium">
                 <input type="datetime-local" id="a-kickoff">
-                <button onclick="addMatch()" style="background:#28a745;color:white;border:none;padding:12px;width:100%;border-radius:8px;margin:5px 0;">Add Match</button>
+                <button class="primary" onclick="addMatch()">Add Match</button>
             </div>
-            <div id="admin-results" style="display:none;margin-top:20px;">
-                <div id="results-list"></div>
-            </div>
-        </div>
-    </div>
+        </div>    </div>
 
     <div class="nav">
         <button class="active" onclick="showTab('matches')">⚽ Matches</button>
-        <button onclick="showTab('leaderboard')">🏆 Leaderboard</button>        <button onclick="showTab('profile')">👤 Profile</button>
+        <button onclick="showTab('leaderboard')">🏆 Leaderboard</button>
+        <button onclick="showTab('profile')">👤 Profile</button>
         <button onclick="showTab('admin')">⚙️ Admin</button>
     </div>
 
     <script type="module">
-        // Initialize Telegram
+        // Import Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs, query, where, orderBy, addDoc, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        
+        // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSy...",  // ← YOUR CONFIG
+            authDomain: "epl-predictor.firebaseapp.com",
+            projectId: "epl-predictor",
+            storageBucket: "epl-predictor.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123"
+        };
+        
+        // Initialize
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Telegram
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
-        
         const user = tg.initDataUnsafe?.user;
         const userId = user?.id?.toString() || null;
         window.telegramUserId = userId;
         
         let currentGW = 31;
-        let db = null;
+        let isAdmin = false;
         
-        // Initialize Firebase
-        async function initFirebase() {
-            try {
-                document.getElementById('status').innerHTML = '🔄 Connecting to Firebase...';
-                
-                const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-                const { getFirestore, collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-                
-                // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
-                const firebaseConfig = {
-                    apiKey: "AIzaSyAaqYXuYEg_pIPMHfbz7i1jcVCgeGJ_4zs",
-                    authDomain: "epl-predictor-ae53f.firebaseapp.com",
-                    projectId: "epl-predictor-ae53f",
-                    storageBucket: "epl-predictor-ae53f.firebasestorage.app",
-                    messagingSenderId: "956744043344",
-                    appId: "1:956744043344:web:79a7bdedc55d14eec43a55"
-                };
-                
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                
-                document.getElementById('status').innerHTML = '✅ Connected!';
-                
-                // Test connection
-                const testSnapshot = await getDocs(collection(db, 'matches'));
-                console.log('✅ Firebase working! Found', testSnapshot.size, 'matches');
-                
-                loadMatches();
-                
-            } catch (error) {
-                console.error('Firebase Error:', error);
-                document.getElementById('status').innerHTML = `
-                    <div style="text-align:left;font-size:12px;">                        ❌ Firebase Error:<br>
-                        ${error.message}<br><br>
-                        <strong>Fix:</strong> Update firebaseConfig with your actual config from Firebase Console
-                    </div>
-                `;
-            }
-        }
+        document.getElementById('status').innerHTML = '✅ Connected!';
         
         // Load Matches
         async function loadMatches() {
             const container = document.getElementById('matches-list');
-            container.innerHTML = '<div class="loading">Loading matches...</div>';
+            container.innerHTML = '<div class="loading">Loading...</div>';
             
             try {
-                const { collection, query, where } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
                 const matchesRef = collection(db, 'matches');
                 const q = query(matchesRef, where('gameweek', '==', currentGW));
-                const snapshot = await getDocs(q);
-                
+                const snapshot = await getDocs(q);                
                 container.innerHTML = '';
                 
                 if (snapshot.empty) {
-                    container.innerHTML = '<div class="warning">⚠️ No matches for Gameweek ' + currentGW + '</div>';
+                    container.innerHTML = '<div class="warning">⚠️ No matches for GW' + currentGW + '</div>';
                     return;
                 }
                 
@@ -227,34 +209,31 @@
                     
                     let dateStr = 'TBD';
                     if (m.kickoffTime) {
-                        try {
-                            const d = m.kickoffTime.toDate ? m.kickoffTime.toDate() : new Date(m.kickoffTime);
-                            dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                        } catch(e) { dateStr = 'Invalid date'; }
+                        const d = m.kickoffTime.toDate ? m.kickoffTime.toDate() : new Date(m.kickoffTime);
+                        dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                     }
                     
                     const isDone = m.status === 'finished';
                     
                     div.innerHTML = `
                         <div class="teams">
-                            <span>${m.homeTeam || 'Home'}</span>
-                            <span>${isDone ? (m.realHomeScore||0) + ' - ' + (m.realAwayScore||0) : 'VS'}</span>
-                            <span>${m.awayTeam || 'Away'}</span>
+                            <span>${m.homeTeam}</span>
+                            <span>${isDone ? m.realHomeScore + ' - ' + m.realAwayScore : 'VS'}</span>
+                            <span>${m.awayTeam}</span>
                         </div>
                         <div class="info">
                             <span>📅 ${dateStr}</span>
-                            <span>🏆 GW${m.gameweek}</span>                        </div>
+                            <span>🏆 GW${m.gameweek}</span>
+                        </div>
                         <div class="info" style="margin-top:5px;">
                             <span>📍 ${m.stadium || 'TBD'}</span>
                             <span>${isDone ? '✅ Finished' : '🔮 Predict'}</span>
                         </div>
                     `;
-                    
                     container.appendChild(div);
                 });
-                
             } catch (error) {
-                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
             }
         }
         
@@ -264,9 +243,7 @@
             container.innerHTML = '<div class="loading">Loading...</div>';
             
             try {
-                const { collection, orderBy } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, orderBy('totalPoints', 'desc'));
+                const usersRef = collection(db, 'users');                const q = query(usersRef, orderBy('totalPoints', 'desc'));
                 const snapshot = await getDocs(q);
                 
                 container.innerHTML = '';
@@ -292,9 +269,9 @@
                     `;
                     container.appendChild(div);
                     rank++;
-                });                
+                });
             } catch (error) {
-                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
             }
         }
         
@@ -303,22 +280,19 @@
             const container = document.getElementById('profile-list');
             
             if (!userId) {
-                container.innerHTML = '<div class="error">Not logged in via Telegram</div>';
+                container.innerHTML = '<div class="error">Not logged in</div>';
                 return;
             }
             
             container.innerHTML = '<div class="loading">Loading...</div>';
             
             try {
-                const { collection, query, where, addDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
                 const usersRef = collection(db, 'users');
                 const q = query(usersRef, where('userId', '==', userId));
                 const snapshot = await getDocs(q);
                 
                 if (snapshot.empty) {
-                    // Create new user
-                    await addDoc(usersRef, {
-                        userId: userId,
+                    await addDoc(usersRef, {                        userId: userId,
                         displayName: user?.first_name || 'User',
                         username: user?.username || '',
                         totalPoints: 0,
@@ -327,50 +301,47 @@
                         isPaid: false,
                         createdAt: new Date()
                     });
-                    
-                    container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name || 'User') + '!</div>';
+                    container.innerHTML = '<div class="warning">✅ Profile created!<br>Welcome, ' + (user?.first_name || 'User') + '!</div>';
                     return;
                 }
                 
                 const u = snapshot.docs[0].data();
-                
                 container.innerHTML = `
                     <div class="match-card">
-                        <h3 style="margin-bottom:15px;">👤 ${u.displayName || 'User'}</h3>
+                        <h3 style="margin-bottom:15px;">👤 ${u.displayName}</h3>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                             <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
                                 <div style="font-size:24px;font-weight:bold;color:#2481cc;">${u.totalPoints||0}</div>
-                                <div style="font-size:12px;color:#666;">Points</div>
-                            </div>                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                                <div style="font-size:12px;">Points</div>
+                            </div>
+                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
                                 <div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div>
-                                <div style="font-size:12px;color:#666;">Wins</div>
+                                <div style="font-size:12px;">Wins</div>
                             </div>
                             <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
                                 <div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div>
-                                <div style="font-size:12px;color:#666;">Losses</div>
+                                <div style="font-size:12px;">Losses</div>
                             </div>
                             <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
                                 <div style="font-size:24px;">${u.isPaid ? '✅' : '❌'}</div>
-                                <div style="font-size:12px;color:#666;">Paid</div>
+                                <div style="font-size:12px;">Paid</div>
                             </div>
                         </div>
                     </div>
                 `;
-                
             } catch (error) {
-                container.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
             }
         }
         
-        // Tab Navigation
+        // Navigation
         window.showTab = function(tab) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(tab + '-page').classList.add('active');
             document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
             
-            if (tab === 'matches') loadMatches();
-            if (tab === 'leaderboard') loadLeaderboard();
+            if (tab === 'matches') loadMatches();            if (tab === 'leaderboard') loadLeaderboard();
             if (tab === 'profile') loadProfile();
         };
         
@@ -381,24 +352,30 @@
             loadMatches();
         };
         
-        // Admin Functions
+        // Admin
         window.checkAdmin = function() {
-            const pass = document.getElementById('admin-pass').value;
-            if (pass === 'admin123') {
-                document.getElementById('admin-content').style.display = 'none';
+            if (document.getElementById('admin-pass').value === 'admin123') {
+                isAdmin = true;
+                document.getElementById('admin-login').style.display = 'none';
                 document.getElementById('admin-panel').style.display = 'block';
             } else {
                 alert('Wrong password!');
             }
-        };        
+        };
+        
+        window.logoutAdmin = function() {
+            isAdmin = false;
+            document.getElementById('admin-login').style.display = 'block';
+            document.getElementById('admin-panel').style.display = 'none';
+            document.getElementById('admin-add').style.display = 'none';
+        };
+        
         window.showAdmin = function(section) {
             document.getElementById('admin-add').style.display = section === 'add' ? 'block' : 'none';
-            document.getElementById('admin-results').style.display = section === 'results' ? 'block' : 'none';
         };
         
         window.addMatch = async function() {
             try {
-                const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
                 await addDoc(collection(db, 'matches'), {
                     homeTeam: document.getElementById('a-home').value,
                     awayTeam: document.getElementById('a-away').value,
@@ -411,13 +388,14 @@
                     createdAt: new Date()
                 });
                 alert('✅ Match added!');
-            } catch (error) {
-                alert('Error: ' + error.message);
+                document.getElementById('a-home').value = '';
+                document.getElementById('a-away').value = '';
+            } catch (error) {                alert('Error: ' + error.message);
             }
         };
         
-        // Start
-        initFirebase();
+        // Load matches on start
+        loadMatches();
     </script>
 </body>
-</html>
+    </html>
