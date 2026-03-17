@@ -27,6 +27,7 @@
             padding: 15px;
             margin-bottom: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
         }
         .teams {
             display: flex;
@@ -42,22 +43,11 @@
             display: flex;
             justify-content: space-between;
         }
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;        }
-        .warning {
-            background: #fff3cd;
-            color: #856404;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
+        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .warning { background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 10px 0; }
         .nav {
-            position: fixed;
-            bottom: 0;
+            position: fixed;            bottom: 0;
             left: 0;
             right: 0;
             background: white;
@@ -76,10 +66,7 @@
             cursor: pointer;
             font-weight: 600;
         }
-        .nav button.active {
-            background: #2481cc;
-            color: white;
-        }
+        .nav button.active { background: #2481cc; color: white; }
         .page { display: none; }
         .page.active { display: block; }
         .loading { text-align: center; padding: 40px; color: #666; }
@@ -92,12 +79,99 @@
             border-radius: 8px;
             margin: 5px 0;
             cursor: pointer;
+            font-weight: 600;
         }
-        input, select {
+        button.danger { background: #dc3545; }
+        button.success { background: #28a745; }
+        button.warning { background: #ffc107; color: #000; }
+        input, select, textarea {
             width: 100%;
             padding: 12px;
-            margin: 5px 0;            border: 1px solid #ddd;
+            margin: 5px 0;
+            border: 1px solid #ddd;
             border-radius: 8px;
+        }
+        textarea { min-height: 100px; resize: vertical; }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .prediction-inputs {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .prediction-inputs input {
+            width: 80px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .prediction-inputs span { font-size: 24px; font-weight: bold; }
+        
+        /* Admin buttons on match cards */
+        .admin-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+        }
+        .admin-actions button {
+            padding: 5px 10px;            font-size: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn-edit { background: #ffc107; color: #000; }
+        .btn-delete { background: #dc3545; color: white; }
+        .btn-result { background: #28a745; color: white; }
+        
+        .user-prediction {
+            background: #e7f3ff;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .result-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .result-input input {
+            width: 80px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -107,6 +181,7 @@
         <div id="status">🔄 Initializing...</div>
     </div>
 
+    <!-- MATCHES PAGE -->
     <div id="matches-page" class="page active">
         <h2 style="text-align:center;margin-bottom:15px;">
             <button onclick="changeGW(-1)" style="width:40px;margin-right:10px;">◀</button>
@@ -116,37 +191,121 @@
         <div id="matches-list"></div>
     </div>
 
+    <!-- LEADERBOARD PAGE -->
     <div id="leaderboard-page" class="page">
         <h2 style="margin-bottom:15px;">🏆 Leaderboard</h2>
-        <div id="leaderboard-list"></div>
-    </div>
+        <div id="leaderboard-list"></div>    </div>
 
+    <!-- PROFILE PAGE -->
     <div id="profile-page" class="page">
         <h2 style="margin-bottom:15px;">👤 Profile</h2>
         <div id="profile-list"></div>
     </div>
 
+    <!-- ADMIN PAGE -->
     <div id="admin-page" class="page">
         <h2 style="margin-bottom:15px;">⚙️ Admin Panel</h2>
         <div id="admin-login">
-            <input type="password" id="admin-pass" placeholder="Enter password">
+            <input type="password" id="admin-pass" placeholder="Enter admin password">
             <button class="primary" onclick="checkAdmin()">Login</button>
         </div>
         <div id="admin-panel" style="display:none;">
-            <button class="primary" onclick="showAdmin('add')">➕ Add Matches</button>
-            <button class="primary" onclick="showAdmin('results')">📊 Enter Results</button>
-            <button class="primary" onclick="logoutAdmin()" style="background:#dc3545;">Logout</button>
+            <button class="primary success" onclick="showAdmin('add')">➕ Add Matches</button>
+            <button class="primary warning" onclick="showAdmin('results')">📊 Enter Results</button>
+            <button class="primary" onclick="showAdmin('users')">👥 Manage Users</button>
+            <button class="primary" onclick="showAdmin('notify')">📢 Send Notification</button>
+            <button class="primary danger" onclick="logoutAdmin()">Logout</button>
             
+            <!-- Add Matches Section -->
             <div id="admin-add" style="display:none;margin-top:20px;">
+                <h3 style="margin-bottom:10px;">Add New Match</h3>
                 <input type="number" id="a-gw" placeholder="Gameweek" value="31">
                 <input type="text" id="a-home" placeholder="Home Team">
                 <input type="text" id="a-away" placeholder="Away Team">
                 <input type="text" id="a-stadium" placeholder="Stadium">
                 <input type="datetime-local" id="a-kickoff">
-                <button class="primary" onclick="addMatch()">Add Match</button>
+                <button class="primary success" onclick="addMatch()">Add Match</button>
             </div>
-        </div>    </div>
+            
+            <!-- Enter Results Section -->
+            <div id="admin-results" style="display:none;margin-top:20px;">
+                <h3 style="margin-bottom:10px;">Enter Match Results</h3>
+                <select id="results-gw" onchange="loadResultsSection()">
+                    <option value="31">Gameweek 31</option>
+                </select>
+                <div id="results-container"></div>
+            </div>
+            
+            <!-- Manage Users Section -->
+            <div id="admin-users" style="display:none;margin-top:20px;">
+                <h3 style="margin-bottom:10px;">Create User (Non-Telegram)</h3>
+                <input type="text" id="u-name" placeholder="Display Name">
+                <input type="text" id="u-username" placeholder="Username (optional)">
+                <input type="text" id="u-team" placeholder="Favorite Team (optional)">
+                <select id="u-paid">
+                    <option value="false">Not Paid</option>                    <option value="true">Paid</option>
+                </select>
+                <button class="primary success" onclick="createUser()">Create User</button>
+                
+                <h3 style="margin:20px 0 10px;">All Users</h3>
+                <div id="users-list"></div>
+            </div>
+            
+            <!-- Notifications Section -->
+            <div id="admin-notify" style="display:none;margin-top:20px;">
+                <h3 style="margin-bottom:10px;">Send Notification</h3>
+                <input type="text" id="notify-title" placeholder="Notification Title">
+                <textarea id="notify-message" placeholder="Message"></textarea>
+                <button class="primary success" onclick="sendNotification()">Send to All Users</button>
+            </div>
+        </div>
+    </div>
 
+    <!-- PREDICTION MODAL -->
+    <div id="prediction-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">🔮 Make Prediction</div>
+            <div id="prediction-match-info" style="text-align:center;margin-bottom:20px;font-weight:bold;"></div>
+            <div class="prediction-inputs">
+                <input type="number" id="pred-home" min="0" max="20" placeholder="0">
+                <span>-</span>
+                <input type="number" id="pred-away" min="0" max="20" placeholder="0">
+            </div>
+            <button class="primary success" onclick="submitPrediction()">Submit Prediction</button>
+            <button class="primary" onclick="closeModal()" style="margin-top:10px;background:#6c757d;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- EDIT MATCH MODAL -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">✏️ Edit Match</div>
+            <input type="hidden" id="edit-match-id">
+            <input type="text" id="edit-home" placeholder="Home Team">
+            <input type="text" id="edit-away" placeholder="Away Team">
+            <input type="text" id="edit-stadium" placeholder="Stadium">
+            <input type="datetime-local" id="edit-kickoff">
+            <button class="primary success" onclick="saveEdit()">Save Changes</button>
+            <button class="primary" onclick="closeEditModal()" style="margin-top:10px;background:#6c757d;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- ENTER RESULT MODAL -->
+    <div id="result-modal" class="modal">
+        <div class="modal-content">            <div class="modal-header">📊 Enter Result</div>
+            <input type="hidden" id="result-match-id">
+            <div id="result-match-info" style="text-align:center;margin-bottom:20px;font-weight:bold;"></div>
+            <div class="result-input">
+                <input type="number" id="result-home" min="0" max="20" placeholder="Home">
+                <span>-</span>
+                <input type="number" id="result-away" min="0" max="20" placeholder="Away">
+            </div>
+            <button class="primary success" onclick="saveResult()">Save Result</button>
+            <button class="primary" onclick="closeResultModal()" style="margin-top:10px;background:#6c757d;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- NAVIGATION -->
     <div class="nav">
         <button class="active" onclick="showTab('matches')">⚽ Matches</button>
         <button onclick="showTab('leaderboard')">🏆 Leaderboard</button>
@@ -155,21 +314,20 @@
     </div>
 
     <script type="module">
-        // Import Firebase
+        // Firebase imports
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, getDocs, query, where, orderBy, addDoc, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, collection, getDocs, query, where, orderBy, addDoc, doc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         
         // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyAaqYXuYEg_pIPMHfbz7i1jcVCgeGJ_4zs",
-            authDomain: "epl-predictor-ae53f.firebaseapp.com",
-            projectId: "epl-predictor-ae53f",
-            storageBucket: "epl-predictor-ae53f.firebasestorage.app",
-            messagingSenderId: "956744043344",
-            appId: "1:956744043344:web:79a7bdedc55d14eec43a55"
+  authDomain: "epl-predictor-ae53f.firebaseapp.com",
+  projectId: "epl-predictor-ae53f",
+  storageBucket: "epl-predictor-ae53f.firebasestorage.app",
+  messagingSenderId: "956744043344",
+  appId: "1:956744043344:web:79a7bdedc55d14eec43a55"
         };
         
-        // Initialize
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         
@@ -183,10 +341,10 @@
         
         let currentGW = 31;
         let isAdmin = false;
-        
+        let currentMatchId = null;        
         document.getElementById('status').innerHTML = '✅ Connected!';
         
-        // Load Matches
+        // ==================== MATCHES ====================
         async function loadMatches() {
             const container = document.getElementById('matches-list');
             container.innerHTML = '<div class="loading">Loading...</div>';
@@ -194,7 +352,8 @@
             try {
                 const matchesRef = collection(db, 'matches');
                 const q = query(matchesRef, where('gameweek', '==', currentGW));
-                const snapshot = await getDocs(q);                
+                const snapshot = await getDocs(q);
+                
                 container.innerHTML = '';
                 
                 if (snapshot.empty) {
@@ -202,8 +361,21 @@
                     return;
                 }
                 
+                // Load user predictions
+                let userPredictions = {};
+                if (userId) {
+                    const predRef = collection(db, 'predictions');
+                    const predQuery = query(predRef, where('userId', '==', userId), where('gameweek', '==', currentGW));
+                    const predSnapshot = await getDocs(predQuery);
+                    predSnapshot.forEach(docSnap => {
+                        const pred = docSnap.data();
+                        userPredictions[pred.matchId] = pred;
+                    });
+                }
+                
                 snapshot.forEach(docSnap => {
                     const m = docSnap.data();
+                    const matchId = docSnap.id;
                     const div = document.createElement('div');
                     div.className = 'match-card';
                     
@@ -214,8 +386,21 @@
                     }
                     
                     const isDone = m.status === 'finished';
+                    const userPred = userPredictions[matchId];
+                    
+                    // Admin buttons
+                    let adminButtons = '';
+                    if (isAdmin) {                        adminButtons = `
+                            <div class="admin-actions">
+                                <button class="btn-edit" onclick="openEditModal('${matchId}', '${m.homeTeam.replace(/'/g, "\\'")}', '${m.awayTeam.replace(/'/g, "\\'")}', '${m.stadium.replace(/'/g, "\\'")}', '${m.kickoffTime}')">✏️</button>
+                                <button class="btn-result" onclick="openResultModal('${matchId}', '${m.homeTeam.replace(/'/g, "\\'")}', '${m.awayTeam.replace(/'/g, "\\'")}')">📊</button>
+                                <button class="btn-delete" onclick="deleteMatch('${matchId}')">🗑️</button>
+                            </div>
+                        `;
+                    }
                     
                     div.innerHTML = `
+                        ${adminButtons}
                         <div class="teams">
                             <span>${m.homeTeam}</span>
                             <span>${isDone ? m.realHomeScore + ' - ' + m.realAwayScore : 'VS'}</span>
@@ -229,7 +414,18 @@
                             <span>📍 ${m.stadium || 'TBD'}</span>
                             <span>${isDone ? '✅ Finished' : '🔮 Predict'}</span>
                         </div>
+                        ${userPred ? `<div class="user-prediction">✅ Your prediction: ${userPred.homeScore} - ${userPred.awayScore}</div>` : ''}
                     `;
+                    
+                    if (!isDone && !isAdmin) {
+                        div.style.cursor = 'pointer';
+                        div.onclick = (e) => {
+                            if (!e.target.closest('.admin-actions')) {
+                                openPredictionModal(matchId, m.homeTeam, m.awayTeam, m.gameweek);
+                            }
+                        };
+                    }
+                    
                     container.appendChild(div);
                 });
             } catch (error) {
@@ -237,7 +433,7 @@
             }
         }
         
-        // Load Leaderboard
+        // ==================== LEADERBOARD ====================
         async function loadLeaderboard() {
             const container = document.getElementById('leaderboard-list');
             container.innerHTML = '<div class="loading">Loading...</div>';
@@ -261,7 +457,7 @@
                     div.innerHTML = `
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div>
-                                <div style="font-weight:bold;">${rank}. ${u.displayName || 'User'}</div>
+                                <div style="font-weight:bold;font-size:16px;">${rank}. ${u.displayName || 'User'}</div>
                                 <div style="font-size:12px;color:#666;">W:${u.totalWins||0} L:${u.totalLosses||0}</div>
                             </div>
                             <div style="font-size:20px;font-weight:bold;color:#2481cc;">${u.totalPoints||0} pts</div>
@@ -271,131 +467,4 @@
                     rank++;
                 });
             } catch (error) {
-                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
-            }
-        }
-        
-        // Load Profile
-        async function loadProfile() {
-            const container = document.getElementById('profile-list');
-            
-            if (!userId) {
-                container.innerHTML = '<div class="error">Not logged in</div>';
-                return;
-            }
-            
-            container.innerHTML = '<div class="loading">Loading...</div>';
-            
-            try {
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, where('userId', '==', userId));
-                const snapshot = await getDocs(q);
-                
-                if (snapshot.empty) {
-                    await addDoc(usersRef, {                        userId: userId,
-                        displayName: user?.first_name || 'User',
-                        username: user?.username || '',
-                        totalPoints: 0,
-                        totalWins: 0,
-                        totalLosses: 0,
-                        isPaid: false,
-                        createdAt: new Date()
-                    });
-                    container.innerHTML = '<div class="warning">✅ Profile created!<br>Welcome, ' + (user?.first_name || 'User') + '!</div>';
-                    return;
-                }
-                
-                const u = snapshot.docs[0].data();
-                container.innerHTML = `
-                    <div class="match-card">
-                        <h3 style="margin-bottom:15px;">👤 ${u.displayName}</h3>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                                <div style="font-size:24px;font-weight:bold;color:#2481cc;">${u.totalPoints||0}</div>
-                                <div style="font-size:12px;">Points</div>
-                            </div>
-                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                                <div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div>
-                                <div style="font-size:12px;">Wins</div>
-                            </div>
-                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                                <div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div>
-                                <div style="font-size:12px;">Losses</div>
-                            </div>
-                            <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                                <div style="font-size:24px;">${u.isPaid ? '✅' : '❌'}</div>
-                                <div style="font-size:12px;">Paid</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } catch (error) {
-                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
-            }
-        }
-        
-        // Navigation
-        window.showTab = function(tab) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(tab + '-page').classList.add('active');
-            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            if (tab === 'matches') loadMatches();            if (tab === 'leaderboard') loadLeaderboard();
-            if (tab === 'profile') loadProfile();
-        };
-        
-        window.changeGW = function(delta) {
-            currentGW += delta;
-            if (currentGW < 1) currentGW = 1;
-            document.getElementById('gw-num').textContent = currentGW;
-            loadMatches();
-        };
-        
-        // Admin
-        window.checkAdmin = function() {
-            if (document.getElementById('admin-pass').value === 'admin123') {
-                isAdmin = true;
-                document.getElementById('admin-login').style.display = 'none';
-                document.getElementById('admin-panel').style.display = 'block';
-            } else {
-                alert('Wrong password!');
-            }
-        };
-        
-        window.logoutAdmin = function() {
-            isAdmin = false;
-            document.getElementById('admin-login').style.display = 'block';
-            document.getElementById('admin-panel').style.display = 'none';
-            document.getElementById('admin-add').style.display = 'none';
-        };
-        
-        window.showAdmin = function(section) {
-            document.getElementById('admin-add').style.display = section === 'add' ? 'block' : 'none';
-        };
-        
-        window.addMatch = async function() {
-            try {
-                await addDoc(collection(db, 'matches'), {
-                    homeTeam: document.getElementById('a-home').value,
-                    awayTeam: document.getElementById('a-away').value,
-                    stadium: document.getElementById('a-stadium').value,
-                    gameweek: parseInt(document.getElementById('a-gw').value),
-                    kickoffTime: new Date(document.getElementById('a-kickoff').value),
-                    status: 'scheduled',
-                    realHomeScore: null,
-                    realAwayScore: null,
-                    createdAt: new Date()
-                });
-                alert('✅ Match added!');
-                document.getElementById('a-home').value = '';
-                document.getElementById('a-away').value = '';
-            } catch (error) {                alert('Error: ' + error.message);
-            }
-        };
-        
-        // Load matches on start
-        loadMatches();
-    </script>
-</body>
-    </html>
+     
