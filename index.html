@@ -353,88 +353,247 @@
             };
             
             // Admin
-            window.checkAdmin = function() {
-                if (document.getElementById('admin-pass').value === 'admin123') {
-                    isAdmin = true;
-                    document.getElementById('admin-login').style.display = 'none';
-                    document.getElementById('admin-panel').style.display = 'block';
-                    loadAllUsers();
-                } else { alert('Wrong password!'); }
-            };
-            window.logoutAdmin = function() { isAdmin = false; document.getElementById('admin-login').style.display = 'block'; document.getElementById('admin-panel').style.display = 'none'; };
-            window.showAdmin = function(section) {
-                ['add', 'results', 'users'].forEach(s => { document.getElementById('admin-' + s).style.display = s === section ? 'block' : 'none'; });
-                if (section === 'results') loadResultsSection();
-                if (section === 'users') loadAllUsers();
-            };
-            window.addMatch = async function() {
-                try {
-                    await addDoc(collection(db, 'matches'), { homeTeam: document.getElementById('a-home').value, awayTeam: document.getElementById('a-away').value, stadium: document.getElementById('a-stadium').value, gameweek: parseInt(document.getElementById('a-gw').value), kickoffTime: new Date(document.getElementById('a-kickoff').value), status: 'scheduled', realHomeScore: null, realAwayScore: null, createdAt: new Date() });
-                    alert('✅ Match added!');
-                    document.getElementById('a-home').value = '';
-                    document.getElementById('a-away').value = '';
-                } catch (error) { alert('Error: ' + error.message); }
-            };
-            window.loadResultsSection = async function() {
-                const container = document.getElementById('results-list');
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                try {
-                    const snapshot = await getDocs(query(collection(db, 'matches'), where('gameweek', '==', currentGW)));
-                    container.innerHTML = '';
-                    if (snapshot.empty) { container.innerHTML = '<div class="warning">No matches</div>'; return; }
-                    snapshot.forEach(docSnap => {
-                        const m = docSnap.data();
-                        const div = document.createElement('div');
-                        div.className = 'match-card';
-                        div.style.marginBottom = '10px';
-                        div.style.padding = '15px';
-                        div.innerHTML = `<div style="font-weight:bold;margin-bottom:10px;">${m.homeTeam} vs ${m.awayTeam}</div><div style="display:flex;gap:10px;"><input type="number" id="score-${docSnap.id}-home" placeholder="Home" value="${m.realHomeScore??''}" style="flex:1;"><input type="number" id="score-${docSnap.id}-away" placeholder="Away" value="${m.realAwayScore??''}" style="flex:1;"></div><button class="primary success" onclick="saveResultFromList('${docSnap.id}')" style="margin-top:10px;">Save</button>`;
-                        container.appendChild(div);
-                    });
-                } catch (error) { container.innerHTML = '<div class="error">Error: ' + error.message + '</div>'; }
-            };
-            window.saveResultFromList = async function(matchId) {
-                const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
-                const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
-                if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores'); return; }
-                try {
-                    await updateDoc(doc(db, 'matches', matchId), { realHomeScore: homeScore, realAwayScore: awayScore, status: 'finished' });
-                    alert('✅ Result saved!');
-                    loadResultsSection();
-                } catch (error) { alert('Error: ' + error.message); }
-            };
-            window.createUser = async function() {
-                const name = document.getElementById('u-name').value;
-                if (!name) { alert('Enter name'); return; }
-                try {
-                    await addDoc(collection(db, 'users'), { userId: 'manual_' + Date.now(), displayName: name, username: document.getElementById('u-username').value||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid: document.getElementById('u-paid').value==='true', createdAt: new Date(), isTelegramUser: false });
-                    alert('✅ User created!');
-                    document.getElementById('u-name').value = '';
-                    loadAllUsers();
-                } catch (error) { alert('Error: ' + error.message); }
-            };
-            window.loadAllUsers = async function() {
-                const container = document.getElementById('users-list');
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                try {
-                    const snapshot = await getDocs(collection(db, 'users'));
-                    container.innerHTML = '';
-                    snapshot.forEach(docSnap => {
-                        const u = docSnap.data();
-                        const div = document.createElement('div');
-                        div.className = 'match-card';
-                        div.style.marginBottom = '10px';
-                        div.style.padding = '15px';
-                        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${u.displayName||'User'}</strong><br><small>${u.isTelegramUser!==false?'📱 Telegram':'👤 Manual'} | ${u.isPaid?'✅ Paid':'❌'} | ${u.totalPoints||0} pts</small></div><button class="admin-btn" onclick="deleteUser('${docSnap.id}')" style="padding:5px 10px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">Delete</button></div>`;
-                        container.appendChild(div);
-                    });
-                } catch (error) { container.innerHTML = '<div class="error">Error: ' + error.message + '</div>'; }
-            };
-            window.deleteUser = async function(uid) {
-                if (!confirm('Delete this user?')) return;
-                try { await deleteDoc(doc(db, 'users', uid)); alert('✅ Deleted!'); loadAllUsers(); }
-                catch (error) { alert('Error: ' + error.message); }
-            };
+            // ==================== ADMIN FUNCTIONS ====================
+window.checkAdmin = function() {
+    console.log('🔍 Admin login attempt...');
+    const password = document.getElementById('admin-pass').value;
+    console.log('🔍 Password entered:', password);
+    
+    if (password === 'admin123') {
+        console.log('✅ Admin login successful!');
+        isAdmin = true;
+        document.getElementById('admin-login').style.display = 'none';
+        document.getElementById('admin-panel').style.display = 'block';
+        alert('✅ Admin login successful!');
+        loadAllUsers();
+    } else {
+        console.log('❌ Wrong password!');
+        alert('❌ Wrong password!\n\nDefault password: admin123');
+    }
+};
+
+window.logoutAdmin = function() {
+    console.log('🔍 Admin logout...');
+    isAdmin = false;
+    document.getElementById('admin-login').style.display = 'block';
+    document.getElementById('admin-panel').style.display = 'none';
+    document.getElementById('admin-pass').value = '';
+    alert('✅ Logged out');
+};
+
+window.showAdmin = function(section) {
+    console.log('🔍 Showing admin section:', section);
+    ['add', 'results', 'users'].forEach(s => {
+        const el = document.getElementById('admin-' + s);
+        if (el) {
+            el.style.display = s === section ? 'block' : 'none';
+        }
+    });
+    if (section === 'results') {
+        loadResultsSection();
+    }
+    if (section === 'users') {
+        loadAllUsers();
+    }
+};
+
+window.addMatch = async function() {
+    console.log('🔍 Adding match...');
+    try {
+        const home = document.getElementById('a-home').value;
+        const away = document.getElementById('a-away').value;
+        const stadium = document.getElementById('a-stadium').value;        const gw = parseInt(document.getElementById('a-gw').value);
+        const kickoff = document.getElementById('a-kickoff').value;
+        
+        if (!home || !away || !kickoff) {
+            alert('Please fill in Home Team, Away Team, and Kickoff Time');
+            return;
+        }
+        
+        await addDoc(collection(db, 'matches'), {
+            homeTeam: home,
+            awayTeam: away,
+            stadium: stadium,
+            gameweek: gw,
+            kickoffTime: new Date(kickoff),
+            status: 'scheduled',
+            realHomeScore: null,
+            realAwayScore: null,
+            createdAt: new Date()
+        });
+        
+        alert('✅ Match added successfully!');
+        document.getElementById('a-home').value = '';
+        document.getElementById('a-away').value = '';
+        document.getElementById('a-stadium').value = '';
+    } catch (error) {
+        console.error('❌ Error adding match:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
+window.loadResultsSection = async function() {
+    console.log('🔍 Loading results section...');
+    const container = document.getElementById('results-list');
+    if (!container) {
+        console.error('❌ Results container not found!');
+        return;
+    }
+    
+    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+    
+    try {
+        const gw = parseInt(document.getElementById('results-gw')?.value) || currentGW;
+        const snapshot = await getDocs(query(collection(db, 'matches'), where('gameweek', '==', gw)));
+        
+        container.innerHTML = '';
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="warning">No matches for GW' + gw + '</div>';
+            return;
+        }        
+        snapshot.forEach(docSnap => {
+            const m = docSnap.data();
+            const div = document.createElement('div');
+            div.className = 'match-card';
+            div.style.marginBottom = '10px';
+            div.style.padding = '15px';
+            div.innerHTML = `
+                <div style="font-weight:bold;margin-bottom:10px;">${m.homeTeam} vs ${m.awayTeam}</div>
+                <div style="display:flex;gap:10px;">
+                    <input type="number" id="score-${docSnap.id}-home" placeholder="Home" value="${m.realHomeScore ?? ''}" style="flex:1;">
+                    <input type="number" id="score-${docSnap.id}-away" placeholder="Away" value="${m.realAwayScore ?? ''}" style="flex:1;">
+                </div>
+                <button class="primary success" onclick="saveResultFromList('${docSnap.id}')" style="margin-top:10px;">Save Result</button>
+            `;
+            container.appendChild(div);
+        });
+        
+        console.log('✅ Results loaded:', snapshot.size, 'matches');
+    } catch (error) {
+        console.error('❌ Error loading results:', error);
+        container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+    }
+};
+
+window.saveResultFromList = async function(matchId) {
+    console.log('🔍 Saving result for match:', matchId);
+    const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
+    const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
+    
+    if (isNaN(homeScore) || isNaN(awayScore)) {
+        alert('Please enter both scores');
+        return;
+    }
+    
+    try {
+        await updateDoc(doc(db, 'matches', matchId), {
+            realHomeScore: homeScore,
+            realAwayScore: awayScore,
+            status: 'finished'
+        });
+        alert('✅ Result saved!');
+        loadResultsSection();
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+};
+
+window.createUser = async function() {
+    console.log('🔍 Creating user...');    const name = document.getElementById('u-name').value;
+    
+    if (!name) {
+        alert('Please enter a display name');
+        return;
+    }
+    
+    try {
+        const newUserId = 'manual_' + Date.now();
+        await addDoc(collection(db, 'users'), {
+            userId: newUserId,
+            displayName: name,
+            username: document.getElementById('u-username').value || '',
+            favoriteTeam: '',
+            totalPoints: 0,
+            totalWins: 0,
+            totalLosses: 0,
+            isPaid: document.getElementById('u-paid').value === 'true',
+            createdAt: new Date(),
+            isTelegramUser: false
+        });
+        
+        alert('✅ User created!\n\nUser ID: ' + newUserId + '\n\nSave this ID for the user!');
+        document.getElementById('u-name').value = '';
+        document.getElementById('u-username').value = '';
+        loadAllUsers();
+    } catch (error) {
+        console.error('❌ Error creating user:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
+window.loadAllUsers = async function() {
+    console.log('🔍 Loading all users...');
+    const container = document.getElementById('users-list');
+    if (!container) {
+        console.error('❌ Users list container not found!');
+        return;
+    }
+    
+    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+    
+    try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        container.innerHTML = '';
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<div class="warning">No users found</div>';
+            return;
+        }        
+        snapshot.forEach(docSnap => {
+            const u = docSnap.data();
+            const div = document.createElement('div');
+            div.className = 'match-card';
+            div.style.marginBottom = '10px';
+            div.style.padding = '15px';
+            div.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-weight:bold;">${u.displayName || 'User'}</div>
+                        <div style="font-size:12px;color:#666;">
+                            ${u.isTelegramUser !== false ? '📱 Telegram' : '👤 Manual'} | 
+                            ${u.isPaid ? '✅ Paid' : '❌ Not Paid'} | 
+                            ${u.totalPoints || 0} pts
+                        </div>
+                    </div>
+                    <button onclick="deleteUser('${docSnap.id}')" style="padding:5px 10px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">Delete</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+        
+        console.log('✅ Users loaded:', snapshot.size, 'users');
+    } catch (error) {
+        console.error('❌ Error loading users:', error);
+        container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+    }
+};
+
+window.deleteUser = async function(uid) {
+    console.log('🔍 Deleting user:', uid);
+    if (!confirm('Are you sure you want to delete this user? This cannot be undone!')) {
+        return;
+    }
+    
+    try {
+        await deleteDoc(doc(db, 'users', uid));
+        alert('✅ User deleted!');
+        loadAllUsers();
+    } catch (error) {
+        console.error('❌ Error deleting user:', error);
+        alert('Error: ' + error.message);
+    }
+};
             
             // Navigation
             window.showTab = function(tab) {
