@@ -338,15 +338,60 @@
             
             // Prediction
             window.submitPrediction = async function() {
-                const homeScore = parseInt(document.getElementById('pred-home').value);
-                const awayScore = parseInt(document.getElementById('pred-away').value);
-                if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores'); return; }
-                try {
-                    await addDoc(collection(db, 'predictions'), { userId, matchId: currentMatchId, gameweek: currentGW, homeScore, awayScore, submittedAt: new Date() });
-                    alert('✅ Prediction submitted!');
-                    closeModal();
-                    loadMatches();
-                } catch (error) { alert('Error: ' + error.message); }
+    const homeScore = parseInt(document.getElementById('pred-home').value);
+    const awayScore = parseInt(document.getElementById('pred-away').value);
+    
+    if (isNaN(homeScore) || isNaN(awayScore)) { 
+        alert('Please enter both scores'); 
+        return; 
+    }
+    
+    try {
+        // Check if match has started
+        const matchDoc = await getDoc(doc(db, 'matches', currentMatchId));
+        const matchData = matchDoc.data();
+        
+        if (matchData.kickoffTime) {
+            const kickoff = matchData.kickoffTime.toDate ? matchData.kickoffTime.toDate() : new Date(matchData.kickoffTime);
+            if (new Date() > kickoff) {
+                alert('❌ Cannot submit prediction after match has started!');
+                return;
+            }
+        }
+        
+        // Check if user already has prediction for this match
+        const predRef = collection(db, 'predictions');
+        const existingQuery = query(predRef, where('userId', '==', userId), where('matchId', '==', currentMatchId));
+        const existingSnap = await getDocs(existingQuery);
+        
+        if (!existingSnap.empty) {
+            // Update existing prediction
+            const predDoc = existingSnap.docs[0];
+            await updateDoc(doc(db, 'predictions', predDoc.id), {
+                homeScore: homeScore,
+                awayScore: awayScore,
+                updatedAt: new Date()
+            });
+            alert('✅ Prediction updated successfully!');
+        } else {
+            // Create new prediction
+            await addDoc(predRef, {
+                userId: userId,
+                matchId: currentMatchId,
+                gameweek: currentGW,
+                homeScore: homeScore,
+                awayScore: awayScore,
+                submittedAt: new Date()
+            });
+            alert('✅ Prediction submitted!');
+        }
+        
+        closeModal();
+        loadMatches();
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+};
             };
             window.closeModal = function() { document.getElementById('prediction-modal').classList.remove('active'); };
             
