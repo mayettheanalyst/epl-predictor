@@ -65,33 +65,52 @@
     </div>
 
     <div id="admin-page" class="page">
-        <h2 style="margin-bottom:15px;">⚙️ Admin</h2>
-        <input type="password" id="admin-pass" placeholder="Password">
+    <h2 style="margin-bottom:15px;">⚙️ Admin Panel</h2>
+    
+    <!-- Login Form -->
+    <div id="admin-login">
+        <input type="password" id="admin-pass" placeholder="Enter admin password">
         <button class="primary" onclick="checkAdmin()">Login</button>
-        <div id="admin-panel" style="display:none;margin-top:20px;">
-            <button class="primary success" onclick="showAdmin('add')">Add Match</button>
-            <button class="primary" onclick="showAdmin('results')">Enter Results</button>
-            <button class="primary" onclick="showAdmin('users')">Manage Users</button>
-            <button class="primary danger" onclick="logoutAdmin()">Logout</button>
-            <div id="admin-add" style="display:none;margin-top:10px;">
-                <input id="a-home" placeholder="Home Team">
-                <input id="a-away" placeholder="Away Team">
-                <input id="a-stadium" placeholder="Stadium">
-                <input type="datetime-local" id="a-kickoff">
-                <button class="primary success" onclick="addMatch()">Add</button>
-            </div>
-            <div id="admin-results" style="display:none;margin-top:10px;">
-                <div id="results-list"></div>
-            </div>
-            <div id="admin-users" style="display:none;margin-top:10px;">
-                <input id="u-name" placeholder="Display Name">
-                <input id="u-username" placeholder="Username">
-                <select id="u-paid"><option value="false">Not Paid</option><option value="true">Paid</option></select>
-                <button class="primary success" onclick="createUser()">Create User</button>
-                <div id="users-list" style="margin-top:20px;"></div>
-            </div>
+    </div>
+    
+    <!-- Admin Panel (hidden until login) -->
+    <div id="admin-panel" style="display:none;margin-top:20px;">
+        <button class="primary success" onclick="showAdmin('add')">➕ Add Match</button>
+        <button class="primary" onclick="showAdmin('results')">📊 Enter Results</button>
+        <button class="primary" onclick="showAdmin('users')">👥 Manage Users</button>
+        <button class="primary danger" onclick="logoutAdmin()">Logout</button>
+        
+        <!-- Add Match Section -->
+        <div id="admin-add" style="display:none;margin-top:10px;">
+            <input id="a-gw" type="number" placeholder="Gameweek" value="31">
+            <input id="a-home" placeholder="Home Team">
+            <input id="a-away" placeholder="Away Team">
+            <input id="a-stadium" placeholder="Stadium">
+            <input type="datetime-local" id="a-kickoff">
+            <button class="primary success" onclick="addMatch()">Add Match</button>
+        </div>
+        
+        <!-- Results Section -->
+        <div id="admin-results" style="display:none;margin-top:10px;">
+            <select id="results-gw" onchange="loadResultsSection()">
+                <option value="31">Gameweek 31</option>
+            </select>
+            <div id="results-list" style="margin-top:10px;"></div>
+        </div>
+        
+        <!-- Users Section -->
+        <div id="admin-users" style="display:none;margin-top:10px;">
+            <input id="u-name" placeholder="Display Name">
+            <input id="u-username" placeholder="Username (optional)">
+            <select id="u-paid">
+                <option value="false">Not Paid</option>
+                <option value="true">Paid</option>
+            </select>
+            <button class="primary success" onclick="createUser()">Create User</button>
+            <div id="users-list" style="margin-top:20px;"></div>
         </div>
     </div>
+</div>
 
     <div id="prediction-modal" class="modal">
         <div class="modal-content">
