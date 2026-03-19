@@ -149,541 +149,455 @@
     </div>
 
     <script type="module">
-        console.log('🔍 Script starting...');
-        document.getElementById('status').innerHTML = '📦 Loading Firebase...';
+    console.log('🔍 Script starting...');
+    document.getElementById('status').innerHTML = '📦 Loading Firebase...';
+    
+    try {
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+        const { getFirestore, collection, getDocs, query, where, orderBy, addDoc, doc, updateDoc, deleteDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         
-        try {
-            const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-            const { getFirestore, collection, getDocs, query, where, orderBy, addDoc, doc, updateDoc, deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        console.log('✅ Firebase imported');
+        document.getElementById('status').innerHTML = '🔥 Initializing Firebase...';
+        
+        // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSy...",
+            authDomain: "epl-predictor.firebaseapp.com",
+            projectId: "epl-predictor",
+            storageBucket: "epl-predictor.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        console.log('✅ Firebase initialized');
+        document.getElementById('status').innerHTML = '✅ Connected!';
+        
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+        const user = tg.initDataUnsafe?.user;
+        const userId = user?.id?.toString() || null;
+        
+        let currentGW = 31;
+        let isAdmin = false;
+        let currentMatchId = null;
+        
+        // Load Matches
+        async function loadMatches() {
+            console.log('🔍 Loading matches for GW' + currentGW);
+            const container = document.getElementById('matches-list');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
             
-            console.log('✅ Firebase imported');
-            document.getElementById('status').innerHTML = '🔥 Initializing Firebase...';
-            
-            // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
-            const firebaseConfig = {
-                apiKey: "AIzaSyAaqYXuYEg_pIPMHfbz7i1jcVCgeGJ_4zs",
-                authDomain: "epl-predictor-ae53f.firebaseapp.com",
-                projectId: "epl-predictor-ae53f",
-                storageBucket: "epl-predictor-ae53f.firebasestorage.app",
-                messagingSenderId: "956744043344",
-                appId: "1:956744043344:web:79a7bdedc55d14eec43a55"
-            };
-            
-            console.log('🔍 Config:', firebaseConfig.projectId);
-            const app = initializeApp(firebaseConfig);
-            const db = getFirestore(app);
-            
-            console.log('✅ Firebase initialized');
-            document.getElementById('status').innerHTML = '✅ Connected!';
-            
-            // Telegram
-            const tg = window.Telegram.WebApp;
-            tg.expand();
-            tg.ready();
-            const user = tg.initDataUnsafe?.user;
-            const userId = user?.id?.toString() || null;
-            
-            let currentGW = 31;
-            let isAdmin = false;
-            let currentMatchId = null;
-            
-            // Load Matches
-            async function loadMatches() {
-                console.log('🔍 Loading matches for GW' + currentGW);
-                const container = document.getElementById('matches-list');
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+            try {
+                const matchesRef = collection(db, 'matches');
+                const q = query(matchesRef, where('gameweek', '==', currentGW));
+                const snapshot = await getDocs(q);
                 
-                try {
-                    const matchesRef = collection(db, 'matches');
-                    const q = query(matchesRef, where('gameweek', '==', currentGW));
-                    const snapshot = await getDocs(q);
-                    
-                    console.log('📊 Found', snapshot.size, 'matches');
-                    container.innerHTML = '';
-                    
-                    if (snapshot.empty) {
-                        container.innerHTML = '<div class="warning">⚠️ No matches for GW' + currentGW + '</div>';
-                        return;
+                console.log('📊 Found', snapshot.size, 'matches');
+                container.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    container.innerHTML = '<div class="warning">⚠️ No matches for GW' + currentGW + '</div>';
+                    return;
+                }
+                
+                let userPreds = {};
+                if (userId) {
+                    const predRef = collection(db, 'predictions');
+                    const predQ = query(predRef, where('userId', '==', userId), where('gameweek', '==', currentGW));
+                    const predSnap = await getDocs(predQ);
+                    predSnap.forEach(d => { userPreds[d.data().matchId] = d.data(); });
+                }
+                
+                const byDate = {};
+                snapshot.forEach(docSnap => {
+                    const m = docSnap.data();
+                    let dateKey = 'Unknown';
+                    if (m.kickoffTime) {
+                        const d = m.kickoffTime.toDate ? m.kickoffTime.toDate() : new Date(m.kickoffTime);
+                        dateKey = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                     }
+                    if (!byDate[dateKey]) byDate[dateKey] = [];
+                    byDate[dateKey].push({ id: docSnap.id, ...m });
+                });
+                
+                Object.keys(byDate).sort().forEach(dateStr => {
+                    const header = document.createElement('div');
+                    header.className = 'date-header';
+                    header.textContent = dateStr;
+                    container.appendChild(header);
                     
-                    // Load predictions
-                    let userPreds = {};
-                    if (userId) {
-                        const predRef = collection(db, 'predictions');
-                        const predQ = query(predRef, where('userId', '==', userId), where('gameweek', '==', currentGW));
-                        const predSnap = await getDocs(predQ);
-                        predSnap.forEach(d => { userPreds[d.data().matchId] = d.data(); });
-                    }
-                    
-                    // Group by date
-                    const byDate = {};
-                    snapshot.forEach(docSnap => {
-                        const m = docSnap.data();
-                        let dateKey = 'Unknown';
+                    byDate[dateStr].forEach(match => {
+                        const m = match;
+                        const div = document.createElement('div');
+                        div.className = 'match-card';
+                        
+                        let timeStr = '--:--';
                         if (m.kickoffTime) {
                             const d = m.kickoffTime.toDate ? m.kickoffTime.toDate() : new Date(m.kickoffTime);
-                            dateKey = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                            timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                         }
-                        if (!byDate[dateKey]) byDate[dateKey] = [];
-                        byDate[dateKey].push({ id: docSnap.id, ...m });
-                    });
-                    
-                    // Render
-                    Object.keys(byDate).sort().forEach(dateStr => {
-                        const header = document.createElement('div');
-                        header.className = 'date-header';
-                        header.textContent = dateStr;
-                        container.appendChild(header);
                         
-                        byDate[dateStr].forEach(match => {
-                            const m = match;
-                            const div = document.createElement('div');
-                            div.className = 'match-card';
-                            
-                            let timeStr = '--:--';
-                            if (m.kickoffTime) {
-                                const d = m.kickoffTime.toDate ? m.kickoffTime.toDate() : new Date(m.kickoffTime);
-                                timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                            }
-                            
-                            const isDone = m.status === 'finished';
-                            const userPred = userPreds[match.id];
-                            
-                            div.innerHTML = `
-                                <div class="match-row">
-                                    <div class="match-time">${timeStr}</div>
-                                    <div class="match-teams">
-                                        <div class="team-row">
-                                            <span class="team-name">${m.homeTeam}</span>
-                                            <span class="team-score">${isDone ? m.realHomeScore : (userPred ? userPred.homeScore : '-')}</span>
-                                        </div>
-                                        <div class="team-row">
-                                            <span class="team-name">${m.awayTeam}</span>
-                                            <span class="team-score">${isDone ? m.realAwayScore : (userPred ? userPred.awayScore : '-')}</span>
-                                        </div>
+                        const isDone = m.status === 'finished';
+                        const userPred = userPreds[match.id];
+                        
+                        div.innerHTML = `
+                            <div class="match-row">
+                                <div class="match-time">${timeStr}</div>
+                                <div class="match-teams">
+                                    <div class="team-row">
+                                        <span class="team-name">${m.homeTeam}</span>
+                                        <span class="team-score">${isDone ? m.realHomeScore : (userPred ? userPred.homeScore : '-')}</span>
+                                    </div>
+                                    <div class="team-row">
+                                        <span class="team-name">${m.awayTeam}</span>
+                                        <span class="team-score">${isDone ? m.realAwayScore : (userPred ? userPred.awayScore : '-')}</span>
                                     </div>
                                 </div>
-                                <div class="match-footer">
-                                    <span>📍 ${m.stadium || 'TBD'}</span>
+                            </div>
+                            <div class="match-footer">
+                                <span>📍 ${m.stadium || 'TBD'}</span>
+                                <div>
+                                    <span onclick="viewPredictions('${match.id}', '${m.homeTeam.replace(/'/g, "\\'")}', '${m.awayTeam.replace(/'/g, "\\'")}')" style="color:#667eea;font-weight:bold;cursor:pointer;margin-right:10px;">👁️ View</span>
                                     <span style="color:${isDone ? '#28a745' : '#667eea'};font-weight:bold;">${isDone ? '✅ Finished' : '🔮 Predict'}</span>
                                 </div>
-                                ${userPred && !isDone ? `<div style="background:#e7f3ff;padding:6px 15px;font-size:12px;color:#2481cc;border-top:1px solid #bee5eb;">✅ Your prediction: ${userPred.homeScore} - ${userPred.awayScore}</div>` : ''}
-                            `;
-                            
-                            if (!isDone && !isAdmin) {
-                                div.style.cursor = 'pointer';
-                                div.onclick = () => {
+                            </div>
+                            ${userPred && !isDone ? `<div style="background:#e7f3ff;padding:6px 15px;font-size:12px;color:#2481cc;border-top:1px solid #bee5eb;">✅ Your prediction: ${userPred.homeScore} - ${userPred.awayScore}</div>` : ''}
+                        `;
+                        
+                        if (!isDone && !isAdmin) {
+                            div.style.cursor = 'pointer';
+                            div.onclick = (e) => {
+                                if (!e.target.closest('span')) {
                                     currentMatchId = match.id;
                                     document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
                                     document.getElementById('pred-home').value = '';
                                     document.getElementById('pred-away').value = '';
                                     document.getElementById('prediction-modal').classList.add('active');
-                                };
-                            }
-                            
-                            container.appendChild(div);
-                        });
-                    });
-                } catch (error) {
-                    console.error('❌ Error loading matches:', error);
-                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
-                }
-            }
-            
-            // Leaderboard
-            async function loadLeaderboard() {
-                const container = document.getElementById('leaderboard-list');
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                try {
-                    const usersRef = collection(db, 'users');
-                    const q = query(usersRef, orderBy('totalPoints', 'desc'));
-                    const snapshot = await getDocs(q);
-                    container.innerHTML = '';
-                    if (snapshot.empty) { container.innerHTML = '<div class="warning">No users yet</div>'; return; }
-                    let rank = 1;
-                    snapshot.forEach(docSnap => {
-                        const u = docSnap.data();
-                        const div = document.createElement('div');
-                        div.className = 'match-card';
-                        div.style.padding = '15px';
-                        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${rank}. ${u.displayName||'User'}</strong><br><small>W:${u.totalWins||0} L:${u.totalLosses||0}</small></div><div style="font-size:20px;font-weight:bold;color:#667eea;">${u.totalPoints||0} pts</div></div>`;
+                                }
+                            };
+                        }
+                        
                         container.appendChild(div);
-                        rank++;
                     });
-                } catch (error) {
-                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+                });
+            } catch (error) {
+                console.error('❌ Error loading matches:', error);
+                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+        
+        // Leaderboard
+        async function loadLeaderboard() {
+            const container = document.getElementById('leaderboard-list');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+            try {
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, orderBy('totalPoints', 'desc'));
+                const snapshot = await getDocs(q);
+                container.innerHTML = '';
+                if (snapshot.empty) { container.innerHTML = '<div class="warning">No users yet</div>'; return; }
+                let rank = 1;
+                snapshot.forEach(docSnap => {
+                    const u = docSnap.data();
+                    const div = document.createElement('div');
+                    div.className = 'match-card';
+                    div.style.padding = '15px';
+                    div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${rank}. ${u.displayName||'User'}</strong><br><small>W:${u.totalWins||0} L:${u.totalLosses||0}</small></div><div style="font-size:20px;font-weight:bold;color:#667eea;">${u.totalPoints||0} pts</div></div>`;
+                    container.appendChild(div);
+                    rank++;
+                });
+            } catch (error) {
+                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+        
+        // Profile
+        async function loadProfile() {
+            const container = document.getElementById('profile-list');
+            if (!userId) { container.innerHTML = '<div class="warning">Open from Telegram to view profile</div>'; return; }
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+            try {
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, where('userId', '==', userId));
+                const snapshot = await getDocs(q);
+                if (snapshot.empty) {
+                    await addDoc(usersRef, { userId, displayName: user?.first_name||'User', username: user?.username||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid:false, createdAt:new Date() });
+                    container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name||'User') + '!</div>';
+                    return;
                 }
+                const u = snapshot.docs[0].data();
+                container.innerHTML = `<div class="match-card" style="padding:20px;"><h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div><div style="font-size:12px;">Points</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div><div style="font-size:12px;">Wins</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div><div style="font-size:12px;">Losses</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div><div style="font-size:12px;">Paid</div></div></div></div>`;
+            } catch (error) {
+                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+        
+        // Submit/Update Prediction
+        window.submitPrediction = async function() {
+            const homeScore = parseInt(document.getElementById('pred-home').value);
+            const awayScore = parseInt(document.getElementById('pred-away').value);
+            
+            if (isNaN(homeScore) || isNaN(awayScore)) { 
+                alert('Please enter both scores'); 
+                return; 
             }
             
-            // Profile
-            async function loadProfile() {
-                const container = document.getElementById('profile-list');
-                if (!userId) { container.innerHTML = '<div class="warning">Open from Telegram to view profile</div>'; return; }
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                try {
-                    const usersRef = collection(db, 'users');
-                    const q = query(usersRef, where('userId', '==', userId));
-                    const snapshot = await getDocs(q);
-                    if (snapshot.empty) {
-                        await addDoc(usersRef, { userId, displayName: user?.first_name||'User', username: user?.username||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid:false, createdAt:new Date() });
-                        container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name||'User') + '!</div>';
+            try {
+                const matchDoc = await getDoc(doc(db, 'matches', currentMatchId));
+                const matchData = matchDoc.data();
+                
+                if (matchData.kickoffTime) {
+                    const kickoff = matchData.kickoffTime.toDate ? matchData.kickoffTime.toDate() : new Date(matchData.kickoffTime);
+                    if (new Date() > kickoff) {
+                        alert('❌ Cannot submit prediction after match has started!');
                         return;
                     }
-                    const u = snapshot.docs[0].data();
-                    container.innerHTML = `<div class="match-card" style="padding:20px;"><h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div><div style="font-size:12px;">Points</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div><div style="font-size:12px;">Wins</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div><div style="font-size:12px;">Losses</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div><div style="font-size:12px;">Paid</div></div></div></div>`;
-                } catch (error) {
-                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
                 }
-            }
-            
-            // Prediction
-            window.submitPrediction = async function() {
-    const homeScore = parseInt(document.getElementById('pred-home').value);
-    const awayScore = parseInt(document.getElementById('pred-away').value);
-    
-    if (isNaN(homeScore) || isNaN(awayScore)) { 
-        alert('Please enter both scores'); 
-        return; 
-    }
-    
-    try {
-        // Check if match has started
-        const matchDoc = await getDoc(doc(db, 'matches', currentMatchId));
-        const matchData = matchDoc.data();
-        
-        if (matchData.kickoffTime) {
-            const kickoff = matchData.kickoffTime.toDate ? matchData.kickoffTime.toDate() : new Date(matchData.kickoffTime);
-            if (new Date() > kickoff) {
-                alert('❌ Cannot submit prediction after match has started!');
-                return;
-            }
-        }
-        
-        // Check if user already has prediction for this match
-        const predRef = collection(db, 'predictions');
-        const existingQuery = query(predRef, where('userId', '==', userId), where('matchId', '==', currentMatchId));
-        const existingSnap = await getDocs(existingQuery);
-        
-        if (!existingSnap.empty) {
-            // Update existing prediction
-            const predDoc = existingSnap.docs[0];
-            await updateDoc(doc(db, 'predictions', predDoc.id), {
-                homeScore: homeScore,
-                awayScore: awayScore,
-                updatedAt: new Date()
-            });
-            alert('✅ Prediction updated successfully!');
-        } else {
-            // Create new prediction
-            await addDoc(predRef, {
-                userId: userId,
-                matchId: currentMatchId,
-                gameweek: currentGW,
-                homeScore: homeScore,
-                awayScore: awayScore,
-                submittedAt: new Date()
-            });
-            alert('✅ Prediction submitted!');
-        }
-        
-        closeModal();
-        loadMatches();
-    } catch (error) {
-        alert('Error: ' + error.message);
-    }
-};
-            };
-            window.closeModal = function() { document.getElementById('prediction-modal').classList.remove('active'); };
-            
-            // Result
-            window.openResultModal = function(matchId, home, away) {
-                currentMatchId = matchId;
-                document.getElementById('result-match-info').textContent = home + ' vs ' + away;
-                document.getElementById('result-home').value = '';
-                document.getElementById('result-away').value = '';
-                document.getElementById('result-modal').classList.add('active');
-            };
-            window.closeResultModal = function() { document.getElementById('result-modal').classList.remove('active'); };
-            window.saveResult = async function() {
-                const homeScore = parseInt(document.getElementById('result-home').value);
-                const awayScore = parseInt(document.getElementById('result-away').value);
-                if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores'); return; }
-                try {
-                    await updateDoc(doc(db, 'matches', currentMatchId), { realHomeScore: homeScore, realAwayScore: awayScore, status: 'finished' });
-                    alert('✅ Result saved!');
-                    closeResultModal();
-                    loadResultsSection();
-                } catch (error) { alert('Error: ' + error.message); }
-            };
-            
-            // Admin
-            // ==================== ADMIN FUNCTIONS ====================
-window.checkAdmin = function() {
-    console.log('🔍 Admin login attempt...');
-    const password = document.getElementById('admin-pass').value;
-    console.log('🔍 Password entered:', password);
-    
-    if (password === 'admin123') {
-        console.log('✅ Admin login successful!');
-        isAdmin = true;
-        document.getElementById('admin-login').style.display = 'none';
-        document.getElementById('admin-panel').style.display = 'block';
-        alert('✅ Admin login successful!');
-        loadAllUsers();
-    } else {
-        console.log('❌ Wrong password!');
-        alert('❌ Wrong password!\n\nDefault password: admin123');
-    }
-};
-
-window.logoutAdmin = function() {
-    console.log('🔍 Admin logout...');
-    isAdmin = false;
-    document.getElementById('admin-login').style.display = 'block';
-    document.getElementById('admin-panel').style.display = 'none';
-    document.getElementById('admin-pass').value = '';
-    alert('✅ Logged out');
-};
-
-window.showAdmin = function(section) {
-    console.log('🔍 Showing admin section:', section);
-    ['add', 'results', 'users'].forEach(s => {
-        const el = document.getElementById('admin-' + s);
-        if (el) {
-            el.style.display = s === section ? 'block' : 'none';
-        }
-    });
-    if (section === 'results') {
-        loadResultsSection();
-    }
-    if (section === 'users') {
-        loadAllUsers();
-    }
-};
-
-window.addMatch = async function() {
-    console.log('🔍 Adding match...');
-    try {
-        const home = document.getElementById('a-home').value;
-        const away = document.getElementById('a-away').value;
-        const stadium = document.getElementById('a-stadium').value;        const gw = parseInt(document.getElementById('a-gw').value);
-        const kickoff = document.getElementById('a-kickoff').value;
-        
-        if (!home || !away || !kickoff) {
-            alert('Please fill in Home Team, Away Team, and Kickoff Time');
-            return;
-        }
-        
-        await addDoc(collection(db, 'matches'), {
-            homeTeam: home,
-            awayTeam: away,
-            stadium: stadium,
-            gameweek: gw,
-            kickoffTime: new Date(kickoff),
-            status: 'scheduled',
-            realHomeScore: null,
-            realAwayScore: null,
-            createdAt: new Date()
-        });
-        
-        alert('✅ Match added successfully!');
-        document.getElementById('a-home').value = '';
-        document.getElementById('a-away').value = '';
-        document.getElementById('a-stadium').value = '';
-    } catch (error) {
-        console.error('❌ Error adding match:', error);
-        alert('Error: ' + error.message);
-    }
-};
-
-window.loadResultsSection = async function() {
-    console.log('🔍 Loading results section...');
-    const container = document.getElementById('results-list');
-    if (!container) {
-        console.error('❌ Results container not found!');
-        return;
-    }
-    
-    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-    
-    try {
-        const gw = parseInt(document.getElementById('results-gw')?.value) || currentGW;
-        const snapshot = await getDocs(query(collection(db, 'matches'), where('gameweek', '==', gw)));
-        
-        container.innerHTML = '';
-        
-        if (snapshot.empty) {
-            container.innerHTML = '<div class="warning">No matches for GW' + gw + '</div>';
-            return;
-        }        
-        snapshot.forEach(docSnap => {
-            const m = docSnap.data();
-            const div = document.createElement('div');
-            div.className = 'match-card';
-            div.style.marginBottom = '10px';
-            div.style.padding = '15px';
-            div.innerHTML = `
-                <div style="font-weight:bold;margin-bottom:10px;">${m.homeTeam} vs ${m.awayTeam}</div>
-                <div style="display:flex;gap:10px;">
-                    <input type="number" id="score-${docSnap.id}-home" placeholder="Home" value="${m.realHomeScore ?? ''}" style="flex:1;">
-                    <input type="number" id="score-${docSnap.id}-away" placeholder="Away" value="${m.realAwayScore ?? ''}" style="flex:1;">
-                </div>
-                <button class="primary success" onclick="saveResultFromList('${docSnap.id}')" style="margin-top:10px;">Save Result</button>
-            `;
-            container.appendChild(div);
-        });
-        
-        console.log('✅ Results loaded:', snapshot.size, 'matches');
-    } catch (error) {
-        console.error('❌ Error loading results:', error);
-        container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
-    }
-};
-
-window.saveResultFromList = async function(matchId) {
-    console.log('🔍 Saving result for match:', matchId);
-    const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
-    const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
-    
-    if (isNaN(homeScore) || isNaN(awayScore)) {
-        alert('Please enter both scores');
-        return;
-    }
-    
-    try {
-        await updateDoc(doc(db, 'matches', matchId), {
-            realHomeScore: homeScore,
-            realAwayScore: awayScore,
-            status: 'finished'
-        });
-        alert('✅ Result saved!');
-        loadResultsSection();
-    } catch (error) {
-        alert('Error: ' + error.message);
-    }
-};
-
-window.createUser = async function() {
-    console.log('🔍 Creating user...');    const name = document.getElementById('u-name').value;
-    
-    if (!name) {
-        alert('Please enter a display name');
-        return;
-    }
-    
-    try {
-        const newUserId = 'manual_' + Date.now();
-        await addDoc(collection(db, 'users'), {
-            userId: newUserId,
-            displayName: name,
-            username: document.getElementById('u-username').value || '',
-            favoriteTeam: '',
-            totalPoints: 0,
-            totalWins: 0,
-            totalLosses: 0,
-            isPaid: document.getElementById('u-paid').value === 'true',
-            createdAt: new Date(),
-            isTelegramUser: false
-        });
-        
-        alert('✅ User created!\n\nUser ID: ' + newUserId + '\n\nSave this ID for the user!');
-        document.getElementById('u-name').value = '';
-        document.getElementById('u-username').value = '';
-        loadAllUsers();
-    } catch (error) {
-        console.error('❌ Error creating user:', error);
-        alert('Error: ' + error.message);
-    }
-};
-
-window.loadAllUsers = async function() {
-    console.log('🔍 Loading all users...');
-    const container = document.getElementById('users-list');
-    if (!container) {
-        console.error('❌ Users list container not found!');
-        return;
-    }
-    
-    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-    
-    try {
-        const snapshot = await getDocs(collection(db, 'users'));
-        container.innerHTML = '';
-        
-        if (snapshot.empty) {
-            container.innerHTML = '<div class="warning">No users found</div>';
-            return;
-        }        
-        snapshot.forEach(docSnap => {
-            const u = docSnap.data();
-            const div = document.createElement('div');
-            div.className = 'match-card';
-            div.style.marginBottom = '10px';
-            div.style.padding = '15px';
-            div.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <div style="font-weight:bold;">${u.displayName || 'User'}</div>
-                        <div style="font-size:12px;color:#666;">
-                            ${u.isTelegramUser !== false ? '📱 Telegram' : '👤 Manual'} | 
-                            ${u.isPaid ? '✅ Paid' : '❌ Not Paid'} | 
-                            ${u.totalPoints || 0} pts
-                        </div>
-                    </div>
-                    <button onclick="deleteUser('${docSnap.id}')" style="padding:5px 10px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">Delete</button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-        
-        console.log('✅ Users loaded:', snapshot.size, 'users');
-    } catch (error) {
-        console.error('❌ Error loading users:', error);
-        container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
-    }
-};
-
-window.deleteUser = async function(uid) {
-    console.log('🔍 Deleting user:', uid);
-    if (!confirm('Are you sure you want to delete this user? This cannot be undone!')) {
-        return;
-    }
-    
-    try {
-        await deleteDoc(doc(db, 'users', uid));
-        alert('✅ User deleted!');
-        loadAllUsers();
-    } catch (error) {
-        console.error('❌ Error deleting user:', error);
-        alert('Error: ' + error.message);
-    }
-};
-            
-            // Navigation
-            window.showTab = function(tab) {
-                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-                document.getElementById(tab + '-page').classList.add('active');
-                document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-                event.target.classList.add('active');
-                if (tab === 'matches') loadMatches();
-                if (tab === 'leaderboard') loadLeaderboard();
-                if (tab === 'profile') loadProfile();
-            };
-            window.changeGW = function(delta) {
-                currentGW += delta;
-                if (currentGW < 1) currentGW = 1;
-                document.getElementById('gw-num').textContent = currentGW;
+                
+                const predRef = collection(db, 'predictions');
+                const existingQuery = query(predRef, where('userId', '==', userId), where('matchId', '==', currentMatchId));
+                const existingSnap = await getDocs(existingQuery);
+                
+                if (!existingSnap.empty) {
+                    const predDoc = existingSnap.docs[0];
+                    await updateDoc(doc(db, 'predictions', predDoc.id), {
+                        homeScore: homeScore,
+                        awayScore: awayScore,
+                        updatedAt: new Date()
+                    });
+                    alert('✅ Prediction updated!');
+                } else {
+                    await addDoc(predRef, {
+                        userId: userId,
+                        matchId: currentMatchId,
+                        gameweek: currentGW,
+                        homeScore: homeScore,
+                        awayScore: awayScore,
+                        submittedAt: new Date()
+                    });
+                    alert('✅ Prediction submitted!');
+                }
+                
+                closeModal();
                 loadMatches();
-            };
-            
-            console.log('✅ App ready, loading matches...');
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+        
+        window.closeModal = function() { 
+            document.getElementById('prediction-modal').classList.remove('active'); 
+        };
+        
+        // View Predictions
+        window.viewPredictions = async function(matchId, home, away) {
+            try {
+                document.getElementById('predictions-match-info').textContent = home + ' vs ' + away;
+                const container = document.getElementById('predictions-list');
+                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                document.getElementById('predictions-modal').classList.add('active');
+                
+                const predRef = collection(db, 'predictions');
+                const q = query(predRef, where('matchId', '==', matchId));
+                const snapshot = await getDocs(q);
+                
+                container.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions yet</div>';
+                    return;
+                }
+                
+                for (const predDoc of snapshot.docs) {
+                    const pred = predDoc.data();
+                    const usersRef = collection(db, 'users');
+                    const userQ = query(usersRef, where('userId', '==', pred.userId));
+                    const userSnap = await getDocs(userQ);
+                    
+                    let userName = 'Unknown';
+                    if (!userSnap.empty) {
+                        userName = userSnap.docs[0].data().displayName || 'User';
+                    }
+                    
+                    const div = document.createElement('div');
+                    div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eee;';
+                    div.innerHTML = `
+                        <div style="font-weight:600;">${userName} ${pred.userId === userId ? '(You)' : ''}</div>
+                        <div style="font-size:18px;font-weight:bold;color:#667eea;">${pred.homeScore} - ${pred.awayScore}</div>
+                    `;
+                    container.appendChild(div);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+        
+        window.closePredictionsModal = function() {
+            document.getElementById('predictions-modal').classList.remove('active');
+        };
+        
+        // Admin functions
+        window.checkAdmin = function() {
+            const password = document.getElementById('admin-pass').value;
+            if (password === 'admin123') {
+                isAdmin = true;
+                document.getElementById('admin-login').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+                alert('✅ Admin login successful!');
+                loadAllUsers();
+            } else {
+                alert('❌ Wrong password!');
+            }
+        };
+        
+        window.logoutAdmin = function() {
+            isAdmin = false;
+            document.getElementById('admin-login').style.display = 'block';
+            document.getElementById('admin-panel').style.display = 'none';
+            document.getElementById('admin-pass').value = '';
+        };
+        
+        window.showAdmin = function(section) {
+            ['add', 'results', 'users'].forEach(s => {
+                const el = document.getElementById('admin-' + s);
+                if (el) el.style.display = s === section ? 'block' : 'none';
+            });
+            if (section === 'results') loadResultsSection();
+            if (section === 'users') loadAllUsers();
+        };
+        
+        window.addMatch = async function() {
+            try {
+                const home = document.getElementById('a-home').value;
+                const away = document.getElementById('a-away').value;
+                const stadium = document.getElementById('a-stadium').value;
+                const gw = parseInt(document.getElementById('a-gw').value);
+                const kickoff = document.getElementById('a-kickoff').value;
+                
+                if (!home || !away || !kickoff) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
+                
+                await addDoc(collection(db, 'matches'), {
+                    homeTeam: home,
+                    awayTeam: away,
+                    stadium: stadium,
+                    gameweek: gw,
+                    kickoffTime: new Date(kickoff),
+                    status: 'scheduled',
+                    realHomeScore: null,
+                    realAwayScore: null,
+                    createdAt: new Date()
+                });
+                
+                alert('✅ Match added!');
+                document.getElementById('a-home').value = '';
+                document.getElementById('a-away').value = '';
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+        
+        window.loadResultsSection = async function() {
+            const container = document.getElementById('results-list');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+            try {
+                const gw = parseInt(document.getElementById('results-gw')?.value) || currentGW;
+                const snapshot = await getDocs(query(collection(db, 'matches'), where('gameweek', '==', gw)));
+                container.innerHTML = '';
+                if (snapshot.empty) { container.innerHTML = '<div class="warning">No matches</div>'; return; }
+                snapshot.forEach(docSnap => {
+                    const m = docSnap.data();
+                    const div = document.createElement('div');
+                    div.className = 'match-card';
+                    div.style.marginBottom = '10px';
+                    div.style.padding = '15px';
+                    div.innerHTML = `<div style="font-weight:bold;margin-bottom:10px;">${m.homeTeam} vs ${m.awayTeam}</div><div style="display:flex;gap:10px;"><input type="number" id="score-${docSnap.id}-home" placeholder="Home" value="${m.realHomeScore??''}" style="flex:1;"><input type="number" id="score-${docSnap.id}-away" placeholder="Away" value="${m.realAwayScore??''}" style="flex:1;"></div><button class="primary success" onclick="saveResultFromList('${docSnap.id}')" style="margin-top:10px;">Save</button>`;
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        };
+        
+        window.saveResultFromList = async function(matchId) {
+            const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
+            const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
+            if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores'); return; }
+            try {
+                await updateDoc(doc(db, 'matches', matchId), { realHomeScore: homeScore, realAwayScore: awayScore, status: 'finished' });
+                alert('✅ Result saved!');
+                loadResultsSection();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        };
+        
+        window.createUser = async function() {
+            const name = document.getElementById('u-name').value;
+            if (!name) { alert('Enter name'); return; }
+            try {
+                await addDoc(collection(db, 'users'), { userId: 'manual_' + Date.now(), displayName: name, username: document.getElementById('u-username').value||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid: document.getElementById('u-paid').value==='true', createdAt: new Date(), isTelegramUser: false });
+                alert('✅ User created!');
+                document.getElementById('u-name').value = '';
+                loadAllUsers();
+            } catch (error) { alert('Error: ' + error.message); }
+        };
+        
+        window.loadAllUsers = async function() {
+            const container = document.getElementById('users-list');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+            try {
+                const snapshot = await getDocs(collection(db, 'users'));
+                container.innerHTML = '';
+                snapshot.forEach(docSnap => {
+                    const u = docSnap.data();
+                    const div = document.createElement('div');
+                    div.className = 'match-card';
+                    div.style.marginBottom = '10px';
+                    div.style.padding = '15px';
+                    div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${u.displayName||'User'}</strong><br><small>${u.isTelegramUser!==false?'📱 Telegram':'👤 Manual'} | ${u.isPaid?'✅ Paid':'❌'} | ${u.totalPoints||0} pts</small></div><button onclick="deleteUser('${docSnap.id}')" style="padding:5px 10px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">Delete</button></div>`;
+                    container.appendChild(div);
+                });
+            } catch (error) { container.innerHTML = '<div class="error">Error: ' + error.message + '</div>'; }
+        };
+        
+        window.deleteUser = async function(uid) {
+            if (!confirm('Delete this user?')) return;
+            try { await deleteDoc(doc(db, 'users', uid)); alert('✅ Deleted!'); loadAllUsers(); }
+            catch (error) { alert('Error: ' + error.message); }
+        };
+        
+        // Navigation
+        window.showTab = function(tab) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(tab + '-page').classList.add('active');
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            if (tab === 'matches') loadMatches();
+            if (tab === 'leaderboard') loadLeaderboard();
+            if (tab === 'profile') loadProfile();
+        };
+        
+        window.changeGW = function(delta) {
+            currentGW += delta;
+            if (currentGW < 1) currentGW = 1;
+            document.getElementById('gw-num').textContent = currentGW;
             loadMatches();
-            
-        } catch (error) {
-            console.error('🚨 FATAL ERROR:', error);
-            document.getElementById('status').innerHTML = '❌ Error: ' + error.message;
-            document.body.innerHTML += '<div class="error" style="margin-top:20px;"><strong>🚨 Fatal Error:</strong><br>' + error.message + '<br><br><strong>Check browser console (F12) for details</strong></div>';
-        }
-    </script>
+        };
+        
+        console.log('✅ App ready, loading matches...');
+        loadMatches();
+        
+    } catch (error) {
+        console.error('🚨 FATAL ERROR:', error);
+        document.getElementById('status').innerHTML = '❌ Error: ' + error.message;
+    }
+</script>
 </body>
 </html>
