@@ -141,6 +141,20 @@
         </div>
     </div>
 
+    <!-- NON-TELEGRAM LOGIN MODAL -->
+<div id="login-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">👤 User Login</div>
+        <p style="text-align:center;color:#666;margin-bottom:20px;">Enter your User ID given by admin</p>
+        <input type="text" id="login-userid" placeholder="User ID (e.g., manual_1234567890)">
+        <button class="primary success" onclick="manualLogin()">Login</button>
+        <button class="primary" onclick="closeLoginModal()" style="margin-top:10px;background:#6c757d;">Cancel</button>
+        <p style="text-align:center;margin-top:15px;font-size:12px;color:#666;">
+            Don't have an ID? Ask the admin to create an account for you
+        </p>
+    </div>
+</div>
+
     <div class="nav">
         <button class="active" onclick="showTab('matches')">⚽ Matches</button>
         <button onclick="showTab('leaderboard')">🏆 Leaderboard</button>
@@ -317,24 +331,82 @@
         
         // Profile
         async function loadProfile() {
-            const container = document.getElementById('profile-list');
-            if (!userId) { container.innerHTML = '<div class="warning">Open from Telegram to view profile</div>'; return; }
-            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-            try {
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, where('userId', '==', userId));
-                const snapshot = await getDocs(q);
-                if (snapshot.empty) {
-                    await addDoc(usersRef, { userId, displayName: user?.first_name||'User', username: user?.username||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid:false, createdAt:new Date() });
-                    container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name||'User') + '!</div>';
-                    return;
-                }
-                const u = snapshot.docs[0].data();
-                container.innerHTML = `<div class="match-card" style="padding:20px;"><h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div><div style="font-size:12px;">Points</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div><div style="font-size:12px;">Wins</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div><div style="font-size:12px;">Losses</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div><div style="font-size:12px;">Paid</div></div></div></div>`;
-            } catch (error) {
-                container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+    const container = document.getElementById('profile-list');
+    
+    // Check if user is logged in (Telegram or Manual)
+    const currentUserId = userId || manualUserId;
+    
+    if (!currentUserId) {
+        container.innerHTML = `
+            <div class="match-card" style="padding:20px;text-align:center;">
+                <h3 style="margin-bottom:15px;">👤 Not Logged In</h3>
+                <p style="color:#666;margin-bottom:20px;">You need to log in to view your profile and make predictions</p>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <button class="primary" onclick="showLoginModal()">👤 Login (Non-Telegram User)</button>
+                    <p style="font-size:12px;color:#666;">Or open this app from Telegram to auto-login</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+    
+    try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('userId', '==', currentUserId));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            // This shouldn't happen for manual users, but create if needed
+            if (userId) {
+                await addDoc(usersRef, { 
+                    userId, 
+                    displayName: user?.first_name||'User', 
+                    username: user?.username||'', 
+                    totalPoints:0, 
+                    totalWins:0, 
+                    totalLosses:0, 
+                    isPaid:false, 
+                    createdAt:new Date() 
+                });
+                container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name||'User') + '!</div>';
+                return;
             }
         }
+        
+        const u = snapshot.docs[0].data();
+        
+        container.innerHTML = `
+            <div class="match-card" style="padding:20px;">
+                <h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div>
+                        <div style="font-size:12px;">Points</div>
+                    </div>
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div>
+                        <div style="font-size:12px;">Wins</div>
+                    </div>
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div>
+                        <div style="font-size:12px;">Losses</div>
+                    </div>
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div>
+                        <div style="font-size:12px;">Paid</div>
+                    </div>
+                </div>
+                ${u.favoriteTeam ? `<div style="margin-top:15px;text-align:center;"><strong>Favorite Team:</strong> ${u.favoriteTeam}</div>` : ''}
+                ${!userId && manualUserId ? `<div style="margin-top:15px;text-align:center;font-size:12px;color:#666;">👤 Manual Account<br>User ID: ${manualUserId}</div>` : ''}
+                ${!userId && manualUserId ? `<button class="primary danger" onclick="manualLogout()" style="margin-top:15px;">Logout</button>` : ''}
+            </div>
+        `;
+    } catch (error) {
+        container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+    }
+}
         
         // Submit/Update Prediction
         window.submitPrediction = async function() {
@@ -392,6 +464,63 @@
         window.closeModal = function() { 
             document.getElementById('prediction-modal').classList.remove('active'); 
         };
+
+        // Manual login for non-Telegram users
+let manualUserId = null;
+
+window.showLoginModal = function() {
+    document.getElementById('login-modal').classList.add('active');
+};
+
+window.closeLoginModal = function() {
+    document.getElementById('login-modal').classList.remove('active');
+    document.getElementById('login-userid').value = '';
+};
+
+window.manualLogin = async function() {
+    const inputUserId = document.getElementById('login-userid').value.trim();
+    
+    if (!inputUserId) {
+        alert('Please enter your User ID');
+        return;
+    }
+    
+    try {
+        // Check if user exists in database
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('userId', '==', inputUserId));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            alert('❌ User not found!\n\nPlease contact admin to create an account for you.');
+            return;
+        }
+        
+        // Login successful
+        manualUserId = inputUserId;
+        window.telegramUserId = inputUserId; // Use this for predictions
+        
+        const userData = snapshot.docs[0].data();
+        
+        closeLoginModal();
+        alert('✅ Login successful!\n\nWelcome, ' + (userData.displayName || 'User') + '!');
+        
+        // Reload profile and matches
+        loadProfile();
+        loadMatches();
+        
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+};
+
+window.manualLogout = function() {
+    manualUserId = null;
+    window.telegramUserId = null;
+    alert('✅ Logged out!');
+    loadProfile();
+    loadMatches();
+};
         
         // View Predictions
         window.viewPredictions = async function(matchId, home, away) {
