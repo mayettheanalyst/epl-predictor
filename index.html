@@ -67,7 +67,7 @@
         <h2 style="margin-bottom:15px;">⚙️ Admin</h2>
         <div id="admin-login">
             <input type="password" id="admin-pass" placeholder="Password">
-            <button class="primary" onclick="checkAdmin()">Login</button>
+            <button class="primary" onclick="checkAdmin(event)">Login</button>
         </div>
         <div id="admin-panel" style="display:none;margin-top:20px;">
             <button class="primary success" onclick="showAdmin('add')">Add Match</button>
@@ -278,31 +278,91 @@
             
             // Profile
             async function loadProfile() {
-                const container = document.getElementById('profile-list');
-                
-                if (!userId) {
-                    container.innerHTML = '<div class="warning">Open from Telegram to view profile</div>';
-                    return;
-                }
-                
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                
-                try {
-                    const usersRef = collection(db, 'users');
-                    const q = query(usersRef, where('userId', '==', userId));
-                    const snapshot = await getDocs(q);
-                    
-                    if (snapshot.empty) {                        await addDoc(usersRef, { userId, displayName: user?.first_name||'User', username: user?.username||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid:false, createdAt:new Date(), isTelegramUser: true });
-                        container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name||'User') + '!</div>';
-                        return;
-                    }
-                    
-                    const u = snapshot.docs[0].data();
-                    container.innerHTML = `<div class="match-card" style="padding:20px;"><h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div><div style="font-size:12px;">Points</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div><div style="font-size:12px;">Wins</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div><div style="font-size:12px;">Losses</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div><div style="font-size:12px;">Paid</div></div></div></div>`;
-                } catch (error) {
-                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
-                }
-            }
+    const container = document.getElementById('profile-list');
+    
+    console.log('🔍 loadProfile called, userId:', userId);
+    
+    if (!userId) {
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">Open from Telegram to view profile</div>';
+        return;
+    }
+    
+    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+    
+    try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('userId', '==', userId));
+        const snapshot = await getDocs(q);
+        
+        console.log('📊 Profile query found:', snapshot.size, 'documents');
+        
+        if (snapshot.empty) {
+            console.log('📝 Creating new user profile...');
+            
+            const newUser = {
+                userId: userId,
+                displayName: user?.first_name || user?.username || 'User',
+                username: user?.username || '',
+                favoriteTeam: '',
+                totalPoints: 0,
+                totalWins: 0,
+                totalLosses: 0,
+                isPaid: false,
+                createdAt: new Date(),
+                isTelegramUser: true
+            };
+            
+            console.log('💾 New user data:', newUser);
+            
+            await addDoc(usersRef, newUser);
+            
+            console.log('✅ User created successfully!');
+            
+            container.innerHTML = `
+                <div style="background:#d4edda;color:#155724;padding:15px;border-radius:8px;">
+                    ✅ Profile created!<br><br>
+                    Welcome, ${newUser.displayName}!
+                </div>
+            `;
+            
+            // Reload profile after 2 seconds
+            setTimeout(() => loadProfile(), 2000);
+            return;
+        }
+        
+        // Existing user
+        const u = snapshot.docs[0].data();
+        console.log('✅ Existing user loaded:', u.displayName);
+        
+        container.innerHTML = `
+            <div style="background:white;border-radius:12px;padding:20px;">
+                <h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div>
+                        <div style="font-size:12px;">Points</div>
+                    </div>
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div>
+                        <div style="font-size:12px;">Wins</div>
+                    </div>
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div>
+                        <div style="font-size:12px;">Losses</div>
+                    </div>
+                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
+                        <div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div>
+                        <div style="font-size:12px;">Paid</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('❌ Error in loadProfile:', error);
+        container.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
+    }
+}
             
             // Submit Prediction
             window.submitPrediction = async function() {
@@ -350,17 +410,32 @@
             };
             
             // Admin
-            window.checkAdmin = function() {
-                if (document.getElementById('admin-pass').value === 'admin123') {
-                    isAdmin = true;
-                    document.getElementById('admin-login').style.display = 'none';
-                    document.getElementById('admin-panel').style.display = 'block';
-                    alert('✅ Admin login successful!');
-                    loadAllUsers();
-                } else {
-                    alert('❌ Wrong password!');
-                }
-            };
+            window.checkAdmin = function(event) {
+    // Prevent default form submission
+    if (event) {
+        event.preventDefault();
+    }
+    
+    console.log('🔍 Admin login attempt...');
+    
+    const password = document.getElementById('admin-pass').value;
+    
+    if (password === 'admin123') {
+        console.log('✅ Admin login successful');
+        isAdmin = true;
+        document.getElementById('admin-login').style.display = 'none';
+        document.getElementById('admin-panel').style.display = 'block';
+        
+        // Show success message
+        alert('✅ Admin login successful!');
+        
+        // Load admin data
+        loadAllUsers();
+    } else {
+        console.log('❌ Wrong password');
+        alert('❌ Wrong password!\n\nDefault: admin123');
+    }
+};
             
             window.logoutAdmin = function() {
                 isAdmin = false;
