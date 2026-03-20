@@ -253,27 +253,49 @@
             
             // Leaderboard
             async function loadLeaderboard() {
-                const container = document.getElementById('leaderboard-list');
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                try {
-                    const usersRef = collection(db, 'users');
-                    const q = query(usersRef, orderBy('totalPoints', 'desc'));
-                    const snapshot = await getDocs(q);
-                    container.innerHTML = '';
-                    if (snapshot.empty) { container.innerHTML = '<div class="warning">No users yet</div>'; return; }
-                    let rank = 1;
-                    snapshot.forEach(docSnap => {
-                        const u = docSnap.data();
-                        const div = document.createElement('div');
-                        div.className = 'match-card';
-                        div.style.padding = '15px';
-                        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${rank}. ${u.displayName||'User'}</strong><br><small>W:${u.totalWins||0} L:${u.totalLosses||0}</small></div><div style="font-size:20px;font-weight:bold;color:#667eea;">${u.totalPoints||0} pts</div></div>`;
-                        container.appendChild(div);
-                        rank++;
-                    });
-                } catch (error) {
-                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
-                }
+    const container = document.getElementById('leaderboard-list');
+    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+    
+    try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, orderBy('totalPoints', 'desc'));
+        const snapshot = await getDocs(q);
+        
+        container.innerHTML = '';
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No users yet</div>';
+            return;
+        }
+        
+        let rank = 1;
+        snapshot.forEach(docSnap => {
+            const u = docSnap.data();
+            const div = document.createElement('div');
+            div.style.cssText = 'background:white;border-radius:12px;padding:15px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);';
+            
+            let rankClass = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank + '.';
+            
+            div.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:20px;">${rankClass}</span>
+                        <div>
+                            <div style="font-weight:bold;font-size:16px;">${u.displayName || 'User'}</div>
+                            <div style="font-size:12px;color:#666;">W:${u.totalWins||0} L:${u.totalLosses||0}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:20px;font-weight:bold;color:#667eea;">${u.totalPoints || 0} pts</div>
+                </div>
+            `;
+            container.appendChild(div);
+            rank++;
+        });
+        
+    } catch (error) {
+        console.error('❌ Error loading leaderboard:', error);
+        container.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
+    }
             }
             
             // Profile
@@ -498,17 +520,97 @@
             };
             
             window.saveResultFromList = async function(matchId) {
-                const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
-                const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
-                if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores'); return; }
-                try {
-                    await updateDoc(doc(db, 'matches', matchId), { realHomeScore: homeScore, realAwayScore: awayScore, status: 'finished' });
-                    alert('✅ Result saved!');
-                    loadResultsSection();
-                } catch (error) {
-                    alert('Error: ' + error.message);
-                }
-            };
+    const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
+    const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
+    
+    if (isNaN(homeScore) || isNaN(awayScore)) {
+        alert('Please enter both scores');
+        return;
+    }
+    
+    if (!confirm('Save this result? Points will be calculated automatically.')) {
+        return;
+    }
+    
+    try {
+        // Update match result
+        await updateDoc(doc(db, 'matches', matchId), {
+            realHomeScore: homeScore,
+            realAwayScore: awayScore,
+            status: 'finished'
+        });
+        
+        // Calculate and update points
+        await calculatePoints(matchId, homeScore, awayScore);
+        
+        alert('✅ Result saved & points calculated!\n\nLeaderboard updated!');
+        
+        // Refresh the results section
+        loadResultsSection();
+        
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+};
+
+            // Calculate and update points for all predictions
+async function calculatePoints(matchId, homeScore, awayScore) {
+    console.log('🔍 Calculating points for match:', matchId);
+    console.log('📊 Final score:', homeScore, '-', awayScore);
+    
+    try {
+        const predRef = collection(db, 'predictions');
+        const predQuery = query(predRef, where('matchId', '==', matchId));
+        const predSnapshot = await getDocs(predQuery);
+        
+        console.log('📊 Found', predSnapshot.size, 'predictions for this match');
+        
+        for (const predDoc of predSnapshot.docs) {
+            const pred = predDoc.data();
+            let points = 0;
+            
+            // Exact score = 5 points
+            if (pred.homeScore === homeScore && pred.awayScore === awayScore) {
+                points = 5;
+                console.log('✅ Exact score! +5 pts for user:', pred.userId);
+            }
+            // Correct outcome = 3 points
+            else if (
+                (pred.homeScore > pred.awayScore && homeScore > awayScore) ||
+                (pred.homeScore < pred.awayScore && homeScore < awayScore) ||
+                (pred.homeScore === pred.awayScore && homeScore === awayScore)
+            ) {
+                points = 3;
+                console.log('✅ Correct outcome! +3 pts for user:', pred.userId);
+            }
+            
+            if (points > 0) {
+                // Update user's total points
+                const usersRef = collection(db, 'users');
+                const userQuery = query(usersRef, where('userId', '==', pred.userId));
+                const userSnapshot = await getDocs(userQuery);
+                
+                userSnapshot.forEach(async userDoc => {
+                    const userData = userDoc.data();
+                    const currentPoints = userData.totalPoints || 0;
+                    const currentWins = userData.totalWins || 0;
+                    
+                    await updateDoc(doc(db, 'users', userDoc.id), {
+                        totalPoints: currentPoints + points,
+                        totalWins: currentWins + 1
+                    });
+                    
+                    console.log('✅ Updated user:', userData.displayName, '+', points, 'pts');
+                });
+            }
+        }
+        
+        console.log('✅ Points calculation complete!');
+        
+    } catch (error) {
+        console.error('❌ Error calculating points:', error);
+    }
+}
             
             window.createUser = async function() {
                 const name = document.getElementById('u-name').value.trim();
