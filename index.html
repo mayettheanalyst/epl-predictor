@@ -431,7 +431,7 @@
                 }
                 
                 const predRef = collection(db, 'predictions');
-                const existingQuery = query(predRef, where('userId', '==', userId), where('matchId', '==', currentMatchId));
+                const existingQuery = query(predRef, where('userId', '==', window.telegramUserId), where('matchId', '==', currentMatchId));
                 const existingSnap = await getDocs(existingQuery);
                 
                 if (!existingSnap.empty) {
@@ -444,7 +444,7 @@
                     alert('✅ Prediction updated!');
                 } else {
                     await addDoc(predRef, {
-                        userId: userId,
+                        userId: window.telegramUserId,
                         matchId: currentMatchId,
                         gameweek: currentGW,
                         homeScore: homeScore,
@@ -467,6 +467,7 @@
 
         // Manual login for non-Telegram users
 let manualUserId = null;
+window.telegramUserId = userId || manualUserId;  
 
 window.showLoginModal = function() {
     document.getElementById('login-modal').classList.add('active');
