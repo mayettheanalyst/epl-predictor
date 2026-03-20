@@ -669,15 +669,58 @@ window.manualLogout = function() {
         };
         
         window.createUser = async function() {
-            const name = document.getElementById('u-name').value;
-            if (!name) { alert('Enter name'); return; }
-            try {
-                await addDoc(collection(db, 'users'), { userId: 'manual_' + Date.now(), displayName: name, username: document.getElementById('u-username').value||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid: document.getElementById('u-paid').value==='true', createdAt: new Date(), isTelegramUser: false });
-                alert('✅ User created!');
-                document.getElementById('u-name').value = '';
-                loadAllUsers();
-            } catch (error) { alert('Error: ' + error.message); }
+    console.log('🔍 Creating new user...');
+    
+    const name = document.getElementById('u-name').value.trim();
+    const username = document.getElementById('u-username').value.trim();
+    const paid = document.getElementById('u-paid').value === 'true';
+    
+    if (!name) {
+        alert('❌ Please enter a display name');
+        return;
+    }
+    
+    try {
+        // Generate unique ID
+        const newUserId = 'manual_' + Date.now();
+        console.log('📝 Creating user with ID:', newUserId);
+        
+        // Create user document in Firebase
+        const userRef = collection(db, 'users');
+        const newUser = {
+            userId: newUserId,
+            displayName: name,
+            username: username || '',
+            favoriteTeam: '',
+            totalPoints: 0,
+            totalWins: 0,
+            totalLosses: 0,
+            isPaid: paid,
+            createdAt: new Date(),
+            isTelegramUser: false
         };
+        
+        console.log('💾 User data:', newUser);
+        
+        const docRef = await addDoc(userRef, newUser);
+        
+        console.log('✅ User created with document ID:', docRef.id);
+        
+        alert('✅ User created successfully!\n\n📝 User ID: ' + newUserId + '\n\nSave this ID and give it to the user!');
+        
+        // Clear form
+        document.getElementById('u-name').value = '';
+        document.getElementById('u-username').value = '';
+        document.getElementById('u-paid').value = 'false';
+        
+        // Reload users list
+        loadAllUsers();
+        
+    } catch (error) {
+        console.error('❌ Error creating user:', error);
+        alert('❌ Error creating user:\n\n' + error.message + '\n\nCheck console (F12) for details');
+    }
+};
         
         window.loadAllUsers = async function() {
             const container = document.getElementById('users-list');
