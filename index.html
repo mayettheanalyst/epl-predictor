@@ -208,29 +208,53 @@
                                 timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                             }
                             
-                            const isDone = m.status === 'finished';
-                            const userPred = userPreds[match.id];
-                            
-                            div.innerHTML = `
-                                <div class="match-row">
-                                    <div class="match-time">${timeStr}</div>
-                                    <div class="match-teams">
-                                        <div class="team-row">
-                                            <span class="team-name">${m.homeTeam}</span>
-                                            <span class="team-score">${isDone ? m.realHomeScore : (userPred ? userPred.homeScore : '-')}</span>
-                                        </div>
-                                        <div class="team-row">
-                                            <span class="team-name">${m.awayTeam}</span>
-                                            <span class="team-score">${isDone ? m.realAwayScore : (userPred ? userPred.awayScore : '-')}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="match-footer">
-                                    <span>📍 ${m.stadium || 'TBD'}</span>
-                                    <span style="color:${isDone ? '#28a745' : '#667eea'};font-weight:bold;">${isDone ? '✅ Finished' : '🔮 Predict'}</span>
-                                </div>
-                                ${userPred && !isDone ? `<div style="background:#e7f3ff;padding:6px 15px;font-size:12px;color:#2481cc;border-top:1px solid #bee5eb;">✅ Your prediction: ${userPred.homeScore} - ${userPred.awayScore}</div>` : ''}
-                            `;
+                           // Inside loadMatches, where you create the match card:
+
+const isDone = m.status === 'finished';
+const userPred = userPreds[match.id];
+
+div.innerHTML = `
+    <div class="match-row">
+        <div class="match-time">${timeStr}</div>
+        <div class="match-teams">
+            <div class="team-row">
+                <span class="team-name">${m.homeTeam}</span>
+                <span class="team-score" style="${isDone ? 'color:#dc3545;font-size:20px;' : 'color:#667eea;font-size:18px;'}">
+                    ${isDone ? m.realHomeScore : (userPred ? userPred.homeScore : '-')}
+                </span>
+            </div>
+            <div class="team-row">
+                <span class="team-name">${m.awayTeam}</span>
+                <span class="team-score" style="${isDone ? 'color:#dc3545;font-size:20px;' : 'color:#667eea;font-size:18px;'}">
+                    ${isDone ? m.realAwayScore : (userPred ? userPred.awayScore : '-')}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    ${userPred ? `
+        <div style="background:#e7f3ff;padding:8px 15px;margin:5px 15px;border-radius:6px;font-size:13px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span>🔮 Your prediction:</span>
+                <span style="font-weight:bold;color:#2481cc;font-size:15px;">
+                    ${userPred.homeScore} - ${userPred.awayScore}
+                </span>
+            </div>
+        </div>
+    ` : ''}
+    
+    <div class="match-footer">
+        <span>📍 ${m.stadium || 'TBD'}</span>
+        ${isDone ? `
+            <div style="text-align:right;">
+                <div style="font-weight:bold;color:#dc3545;font-size:16px;">Real Result</div>
+                <div style="color:#28a745;font-weight:bold;">✅ Finished</div>
+            </div>
+        ` : `
+            <span style="color:#667eea;font-weight:bold;">🔮 Predict</span>
+        `}
+    </div>
+`;
                             
                             if (!isDone && !isAdmin && userId) {
                                 div.style.cursor = 'pointer';
