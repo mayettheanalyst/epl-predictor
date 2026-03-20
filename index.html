@@ -194,6 +194,8 @@
         tg.ready();
         const user = tg.initDataUnsafe?.user;
         const userId = user?.id?.toString() || null;
+        let manualUserId = null;
+        window.telegramUserId = userId || manualUserId;
         
         let currentGW = 31;
         let isAdmin = false;
@@ -331,10 +333,13 @@
         
         // Profile
         async function loadProfile() {
+    consasync function loadProfile() {
     const container = document.getElementById('profile-list');
     
     // Check if user is logged in (Telegram or Manual)
-    const currentUserId = userId || manualUserId;
+    const currentUserId = window.telegramUserId || userId || manualUserId;
+    
+    console.log('🔍 Loading profile for user ID:', currentUserId);
     
     if (!currentUserId) {
         container.innerHTML = `
@@ -357,29 +362,50 @@
         const q = query(usersRef, where('userId', '==', currentUserId));
         const snapshot = await getDocs(q);
         
+        console.log('📊 Profile query result:', snapshot.size, 'documents found');
+        
         if (snapshot.empty) {
-            // This shouldn't happen for manual users, but create if needed
-            if (userId) {
-                await addDoc(usersRef, { 
-                    userId, 
-                    displayName: user?.first_name||'User', 
-                    username: user?.username||'', 
-                    totalPoints:0, 
-                    totalWins:0, 
-                    totalLosses:0, 
-                    isPaid:false, 
-                    createdAt:new Date() 
-                });
-                container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name||'User') + '!</div>';
-                return;
-            }
+            console.log('📝 New user detected! Creating profile...');
+            
+            // Create new user document
+            const newUser = {
+                userId: currentUserId,
+                displayName: user?.first_name || user?.username || 'User',
+                username: user?.username || '',
+                favoriteTeam: '',
+                totalPoints: 0,
+                totalWins: 0,
+                totalLosses: 0,
+                isPaid: false,
+                createdAt: new Date(),
+                isTelegramUser: userId ? true : false
+            };
+            
+            console.log('💾 New user data:', newUser);
+                        await addDoc(usersRef, newUser);
+            
+            console.log('✅ User profile created!');
+            
+            container.innerHTML = `
+                <div class="success">
+                    ✅ Profile created!<br><br>
+                    Welcome, ${newUser.displayName}!<br><br>
+                    <small>Your predictions will be saved automatically</small>
+                </div>
+            `;
+            
+            // Reload after short delay
+            setTimeout(() => loadProfile(), 2000);
+            return;
         }
         
+        // Existing user - load profile
         const u = snapshot.docs[0].data();
+        console.log('✅ Existing user loaded:', u.displayName);
         
         container.innerHTML = `
             <div class="match-card" style="padding:20px;">
-                <h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3>
+                <h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName || 'User'}</h3>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                     <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
                         <div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div>
@@ -394,7 +420,7 @@
                         <div style="font-size:12px;">Losses</div>
                     </div>
                     <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                        <div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div>
+                        <div style="font-size:24px;">${u.isPaid ? '✅' : '❌'}</div>
                         <div style="font-size:12px;">Paid</div>
                     </div>
                 </div>
@@ -403,8 +429,15 @@
                 ${!userId && manualUserId ? `<button class="primary danger" onclick="manualLogout()" style="margin-top:15px;">Logout</button>` : ''}
             </div>
         `;
+        
     } catch (error) {
-        container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+        console.error('❌ Error loading profile:', error);        container.innerHTML = `
+            <div class="error">
+                Error loading profile<br><br>
+                <small>${error.message}</small><br><br>
+                <button class="primary" onclick="loadProfile()" style="margin-top:10px;">Try Again</button>
+            </div>
+        `;
     }
 }
         
@@ -442,7 +475,7 @@
                         updatedAt: new Date()
                     });
                     alert('✅ Prediction updated!');
-                } else {
+                } else {.     
                     await addDoc(predRef, {
                         userId: window.telegramUserId,
                         matchId: currentMatchId,
