@@ -194,6 +194,7 @@
         tg.ready();
         const user = tg.initDataUnsafe?.user;
         const userId = user?.id?.toString() || null;
+        
         let manualUserId = null;
         window.telegramUserId = userId || manualUserId;
         
@@ -499,8 +500,6 @@
         };
 
         // Manual login for non-Telegram users
-let manualUserId = null;
-window.telegramUserId = userId || manualUserId;  
 
 window.showLoginModal = function() {
     document.getElementById('login-modal').classList.add('active');
