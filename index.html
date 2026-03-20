@@ -10,7 +10,7 @@
         body { font-family: Arial, sans-serif; background: #f2f2f7; padding: 20px; padding-bottom: 80px; }
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; }
         .header h1 { font-size: 26px; margin-bottom: 5px; text-align: center; }
-        .match-card { background: white; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); position: relative; }
+        .match-card { background: white; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .date-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 15px; border-radius: 10px; margin: 15px 0 10px; font-weight: bold; }
         .match-row { display: flex; align-items: center; padding: 15px; }
         .match-time { width: 60px; text-align: center; font-weight: bold; color: #667eea; font-size: 14px; }
@@ -30,7 +30,7 @@
         button.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; margin: 5px 0; cursor: pointer; }
         button.success { background: #28a745; }
         button.danger { background: #dc3545; }
-        input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; }
+        input, select { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; }
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: white; border-radius: 16px; padding: 25px; width: 90%; max-width: 400px; }
@@ -47,8 +47,7 @@
 
     <div id="matches-page" class="page active">
         <h2 style="text-align:center;margin-bottom:15px;">
-            <button onclick="changeGW(-1)" style="width:40px;border:none;background:#667eea;color:white;border-radius:8px;">◀</button>
-            Gameweek <span id="gw-num">31</span>
+            <button onclick="changeGW(-1)" style="width:40px;border:none;background:#667eea;color:white;border-radius:8px;">◀</button>            Gameweek <span id="gw-num">31</span>
             <button onclick="changeGW(1)" style="width:40px;border:none;background:#667eea;color:white;border-radius:8px;">▶</button>
         </h2>
         <div id="matches-list"></div>
@@ -65,51 +64,263 @@
     </div>
 
     <div id="admin-page" class="page">
-    <h2 style="margin-bottom:15px;">⚙️ Admin Panel</h2>
-    
-    <!-- Login Form -->
-    <div id="admin-login">
-        <input type="password" id="admin-pass" placeholder="Enter admin password">
-        <button class="primary" onclick="checkAdmin()">Login</button>
-    </div>
-    
-    <!-- Admin Panel (hidden until login) -->
-    <div id="admin-panel" style="display:none;margin-top:20px;">
-        <button class="primary success" onclick="showAdmin('add')">➕ Add Match</button>
-        <button class="primary" onclick="showAdmin('results')">📊 Enter Results</button>
-        <button class="primary" onclick="showAdmin('users')">👥 Manage Users</button>
-        <button class="primary danger" onclick="logoutAdmin()">Logout</button>
-        
-        <!-- Add Match Section -->
-        <div id="admin-add" style="display:none;margin-top:10px;">
-            <input id="a-gw" type="number" placeholder="Gameweek" value="31">
-            <input id="a-home" placeholder="Home Team">
-            <input id="a-away" placeholder="Away Team">
-            <input id="a-stadium" placeholder="Stadium">
-            <input type="datetime-local" id="a-kickoff">
-            <button class="primary success" onclick="addMatch()">Add Match</button>
+        <h2 style="margin-bottom:15px;">⚙️ Admin</h2>
+        <div id="admin-login">
+            <input type="password" id="admin-pass" placeholder="Password">
+            <button class="primary" onclick="checkAdmin()">Login</button>
         </div>
-        
-        <!-- Results Section -->
-        <div id="admin-results" style="display:none;margin-top:10px;">
-            <select id="results-gw" onchange="loadResultsSection()">
-                <option value="31">Gameweek 31</option>
-            </select>
-            <div id="results-list" style="margin-top:10px;"></div>
-        </div>
-        
-        <!-- Users Section -->
-        <div id="admin-users" style="display:none;margin-top:10px;">
-            <input id="u-name" placeholder="Display Name">
-            <input id="u-username" placeholder="Username (optional)">
-            <select id="u-paid">
-                <option value="false">Not Paid</option>
-                <option value="true">Paid</option>
-            </select>
-            <button class="primary success" onclick="createUser()">Create User</button>
-            <div id="users-list" style="margin-top:20px;"></div>
+        <div id="admin-panel" style="display:none;margin-top:20px;">
+            <button class="primary success" onclick="showAdmin('add')">Add Match</button>
+            <button class="primary" onclick="showAdmin('results')">Enter Results</button>
+            <button class="primary" onclick="showAdmin('users')">Manage Users</button>
+            <button class="primary danger" onclick="logoutAdmin()">Logout</button>
+            <div id="admin-add" style="display:none;margin-top:10px;">
+                <input id="a-gw" type="number" placeholder="Gameweek" value="31">
+                <input id="a-home" placeholder="Home Team">
+                <input id="a-away" placeholder="Away Team">
+                <input id="a-stadium" placeholder="Stadium">
+                <input type="datetime-local" id="a-kickoff">
+                <button class="primary success" onclick="addMatch()">Add</button>
+            </div>
+            <div id="admin-results" style="display:none;margin-top:10px;">
+                <div id="results-list"></div>
+            </div>
+            <div id="admin-users" style="display:none;margin-top:10px;">
+                <input id="u-name" placeholder="Display Name">
+                <input id="u-username" placeholder="Username">
+                <select id="u-paid"><option value="false">Not Paid</option><option value="true">Paid</option></select>
+                <button class="primary success" onclick="createUser()">Create User</button>
+                <div id="users-list" style="margin-top:20px;"></div>
+            </div>
         </div>
     </div>
+
+    <div id="prediction-modal" class="modal">
+        <div class="modal-content">            <div class="modal-header">🔮 Prediction</div>
+            <div id="prediction-match-info" style="text-align:center;margin-bottom:20px;font-weight:bold;"></div>
+            <div class="prediction-inputs">
+                <input type="number" id="pred-home" min="0" max="20" placeholder="0">
+                <span>-</span>
+                <input type="number" id="pred-away" min="0" max="20" placeholder="0">
+            </div>
+            <button class="primary success" onclick="submitPrediction()">Submit</button>
+            <button class="primary" onclick="closeModal()" style="margin-top:10px;background:#6c757d;">Cancel</button>
+        </div>
+    </div>
+
+    <div class="nav">
+        <button class="active" onclick="showTab('matches')">⚽ Matches</button>
+        <button onclick="showTab('leaderboard')">🏆 Leaderboard</button>
+        <button onclick="showTab('profile')">👤 Profile</button>
+        <button onclick="showTab('admin')">⚙️ Admin</button>
+    </div>
+
+    <script type="module">
+        console.log('🔍 Script starting...');
+        document.getElementById('status').innerHTML = '📦 Loading Firebase...';
+        
+        try {
+            const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+            const { getFirestore, collection, getDocs, query, where, orderBy, addDoc, doc, updateDoc, deleteDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            console.log('✅ Firebase imported');
+            document.getElementById('status').innerHTML = '🔥 Initializing Firebase...';
+            
+            const firebaseConfig = {
+                apiKey: "AIzaSyAaqYXuYEg_pIPMHfbz7i1jcVCgeGJ_4zs",
+  authDomain: "epl-predictor-ae53f.firebaseapp.com",
+  projectId: "epl-predictor-ae53f",
+  storageBucket: "epl-predictor-ae53f.firebasestorage.app",
+  messagingSenderId: "956744043344",
+  appId: "1:956744043344:web:79a7bdedc55d14eec43a55"
+            };
+            
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            
+            console.log('✅ Firebase initialized');
+            document.getElementById('status').innerHTML = '✅ Connected!';
+            
+            // Telegram
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+            tg.ready();
+            const user = tg.initDataUnsafe?.user;            const userId = user?.id?.toString() || null;
+            
+            console.log('🔍 Telegram user ID:', userId);
+            
+            let currentGW = 31;
+            let isAdmin = false;
+            let currentMatchId = null;
+            
+            // Load Matches
+            async function loadMatches() {
+                console.log('🔍 Loading matches for GW' + currentGW);
+                const container = document.getElementById('matches-list');
+                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                
+                try {
+                    const matchesRef = collection(db, 'matches');
+                    const q = query(matchesRef, where('gameweek', '==', currentGW));
+                    const snapshot = await getDocs(q);
+                    
+                    console.log('📊 Found', snapshot.size, 'matches');
+                    container.innerHTML = '';
+                    
+                    if (snapshot.empty) {
+                        container.innerHTML = '<div class="warning">⚠️ No matches for GW' + currentGW + '</div>';
+                        return;
+                    }
+                    
+                    let userPreds = {};
+                    if (userId) {
+                        const predRef = collection(db, 'predictions');
+                        const predQ = query(predRef, where('userId', '==', userId), where('gameweek', '==', currentGW));
+                        const predSnap = await getDocs(predQ);
+                        predSnap.forEach(d => { userPreds[d.data().matchId] = d.data(); });
+                    }
+                    
+                    const byDate = {};
+                    snapshot.forEach(docSnap => {
+                        const m = docSnap.data();
+                        let dateKey = 'Unknown';
+                        if (m.kickoffTime) {
+                            const d = m.kickoffTime.toDate ? m.kickoffTime.toDate() : new Date(m.kickoffTime);
+                            dateKey = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                        }
+                        if (!byDate[dateKey]) byDate[dateKey] = [];
+                        byDate[dateKey].push({ id: docSnap.id, ...m });
+                    });
+                    
+                    Object.keys(byDate).sort().forEach(dateStr => {
+                        const header = document.createElement('div');
+                        header.className = 'date-header';                        header.textContent = dateStr;
+                        container.appendChild(header);
+                        
+                        byDate[dateStr].forEach(match => {
+                            const m = match;
+                            const div = document.createElement('div');
+                            div.className = 'match-card';
+                            
+                            let timeStr = '--:--';
+                            if (m.kickoffTime) {
+                                const d = m.kickoffTime.toDate ? m.kickoffTime.toDate() : new Date(m.kickoffTime);
+                                timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                            }
+                            
+                            const isDone = m.status === 'finished';
+                            const userPred = userPreds[match.id];
+                            
+                            div.innerHTML = `
+                                <div class="match-row">
+                                    <div class="match-time">${timeStr}</div>
+                                    <div class="match-teams">
+                                        <div class="team-row">
+                                            <span class="team-name">${m.homeTeam}</span>
+                                            <span class="team-score">${isDone ? m.realHomeScore : (userPred ? userPred.homeScore : '-')}</span>
+                                        </div>
+                                        <div class="team-row">
+                                            <span class="team-name">${m.awayTeam}</span>
+                                            <span class="team-score">${isDone ? m.realAwayScore : (userPred ? userPred.awayScore : '-')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="match-footer">
+                                    <span>📍 ${m.stadium || 'TBD'}</span>
+                                    <span style="color:${isDone ? '#28a745' : '#667eea'};font-weight:bold;">${isDone ? '✅ Finished' : '🔮 Predict'}</span>
+                                </div>
+                                ${userPred && !isDone ? `<div style="background:#e7f3ff;padding:6px 15px;font-size:12px;color:#2481cc;border-top:1px solid #bee5eb;">✅ Your prediction: ${userPred.homeScore} - ${userPred.awayScore}</div>` : ''}
+                            `;
+                            
+                            if (!isDone && !isAdmin && userId) {
+                                div.style.cursor = 'pointer';
+                                div.onclick = () => {
+                                    currentMatchId = match.id;
+                                    document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
+                                    document.getElementById('pred-home').value = '';
+                                    document.getElementById('pred-away').value = '';
+                                    document.getElementById('prediction-modal').classList.add('active');
+                                };
+                            }
+                            
+                            container.appendChild(div);                        });
+                    });
+                } catch (error) {
+                    console.error('❌ Error loading matches:', error);
+                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+                }
+            }
+            
+            // Leaderboard
+            async function loadLeaderboard() {
+                const container = document.getElementById('leaderboard-list');
+                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                try {
+                    const usersRef = collection(db, 'users');
+                    const q = query(usersRef, orderBy('totalPoints', 'desc'));
+                    const snapshot = await getDocs(q);
+                    container.innerHTML = '';
+                    if (snapshot.empty) { container.innerHTML = '<div class="warning">No users yet</div>'; return; }
+                    let rank = 1;
+                    snapshot.forEach(docSnap => {
+                        const u = docSnap.data();
+                        const div = document.createElement('div');
+                        div.className = 'match-card';
+                        div.style.padding = '15px';
+                        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${rank}. ${u.displayName||'User'}</strong><br><small>W:${u.totalWins||0} L:${u.totalLosses||0}</small></div><div style="font-size:20px;font-weight:bold;color:#667eea;">${u.totalPoints||0} pts</div></div>`;
+                        container.appendChild(div);
+                        rank++;
+                    });
+                } catch (error) {
+                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+                }
+            }
+            
+            // Profile
+            async function loadProfile() {
+                const container = document.getElementById('profile-list');
+                
+                if (!userId) {
+                    container.innerHTML = '<div class="warning">Open from Telegram to view profile</div>';
+                    return;
+                }
+                
+                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                
+                try {
+                    const usersRef = collection(db, 'users');
+                    const q = query(usersRef, where('userId', '==', userId));
+                    const snapshot = await getDocs(q);
+                    
+                    if (snapshot.empty) {                        await addDoc(usersRef, { userId, displayName: user?.first_name||'User', username: user?.username||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid:false, createdAt:new Date(), isTelegramUser: true });
+                        container.innerHTML = '<div class="success">✅ Profile created!<br>Welcome, ' + (user?.first_name||'User') + '!</div>';
+                        return;
+                    }
+                    
+                    const u = snapshot.docs[0].data();
+                    container.innerHTML = `<div class="match-card" style="padding:20px;"><h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div><div style="font-size:12px;">Points</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div><div style="font-size:12px;">Wins</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div><div style="font-size:12px;">Losses</div></div><div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;"><div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div><div style="font-size:12px;">Paid</div></div></div></div>`;
+                } catch (error) {
+                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+                }
+            }
+            
+            // Submit Prediction
+            window.submitPrediction = async function() {
+                const homeScore = parseInt(document.getElementById('pred-home').value);
+                const awayScore = parseInt(document.getElementById('pred-away').value);
+                
+                if (isNaN(homeScore) || isNaN(awayScore)) { 
+                    alert('Please enter both scores'); 
+                    return; 
+                }
+                
+                try {
+                    const matchDoc = await getDoc(doc(db, 'matches', currentMatchId));
+                    const matchData = matchDoc.data();
+                    
+                    if (matchData.kickoffTime) {
+                        const kickoff = matchData.kickoffTime.toDate ? matchData.kickoffTime.toDate() : new Date(matchData.kickoffTime);
+                        if (new Date() > kickoff)     </div>
 </div>
 
     <div id="prediction-modal" class="modal">
