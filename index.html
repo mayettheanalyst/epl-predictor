@@ -394,6 +394,62 @@
             document.getElementById('status').innerHTML = '❌ Error';
             document.body.innerHTML += '<div class="error-box" style="margin-top:20px;"><strong>Error:</strong><br>' + error.message + '</div>';
         }
+
+         // Calculate points for a match
+async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
+    console.log('🎯 Calculating points for GW' + gameweek);
+    
+    try {
+        const predRef = collection(db, 'predictions');
+        const predQuery = query(predRef, where('matchId', '==', matchId));
+        const predSnapshot = await getDocs(predQuery);
+        
+        console.log('Found', predSnapshot.size, 'predictions');
+        
+        for (const predDoc of predSnapshot.docs) {
+            const pred = predDoc.data();
+            let points = 0;
+            
+            // Exact score = 5 points
+            if (pred.homeScore === homeScore && pred.awayScore === awayScore) {
+                points = 5;
+            }
+            // Correct outcome = 3 points
+            else if (
+                (pred.homeScore > pred.awayScore && homeScore > awayScore) ||
+                (pred.homeScore < pred.awayScore && homeScore < awayScore) ||
+                (pred.homeScore === pred.awayScore && homeScore === awayScore)
+            ) {
+                points = 3;
+            }
+            
+            if (points > 0) {
+                // Update user's gameweek points
+                const usersRef = collection(db, 'users');
+                const userQuery = query(usersRef, where('userId', '==', pred.userId));
+                const userSnapshot = await getDocs(userQuery);
+                
+                userSnapshot.forEach(async userDoc => {
+                    const userData = userDoc.data();
+                    const gwField = 'gameweek' + gameweek + 'Points';
+                    const currentPoints = userData[gwField] || 0;
+                    
+                    await updateDoc(doc(db, 'users', userDoc.id), {
+                        [gwField]: currentPoints + points
+                    });
+                    
+                    console.log('Updated', userData.displayName, '+', points, 'pts');
+                });
+            }
+        }
+        
+        console.log('✅ Points calculation done!');
+        
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+        
     </script>
 </body>
 </html>
