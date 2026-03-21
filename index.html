@@ -107,6 +107,95 @@
             
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
+
+            // Calculate points for a match
+async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
+    const resultsDiv = document.createElement('div');
+    resultsDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);color:white;padding:20px;z-index:9999;overflow:auto;font-size:14px;';
+    resultsDiv.innerHTML = '<h3 style="margin-bottom:20px;"> Debugging Points Calculation</h3><div id="debug-content" style="background:#1a1a2e;padding:15px;border-radius:8px;"></div><button onclick="this.parentElement.remove()" style="margin-top:20px;padding:10px 20px;background:#667eea;color:white;border:none;border-radius:8px;">Close</button>';
+    document.body.appendChild(resultsDiv);
+    
+    const log = (msg) => {
+        document.getElementById('debug-content').innerHTML += '<div style="margin:5px 0;padding:5px;background:rgba(255,255,255,0.1);border-radius:4px;">' + msg + '</div>';
+    };
+    
+    try {
+        log('🎯 Starting calculation...');
+        log('Match ID: ' + matchId);
+        log('Score: ' + homeScore + '-' + awayScore);
+        log('Gameweek: ' + gameweek);
+        
+        const predRef = collection(db, 'predictions');
+        const predQuery = query(predRef, where('matchId', '==', matchId));
+        const predSnapshot = await getDocs(predQuery);
+        
+        log('📊 Found ' + predSnapshot.size + ' predictions');
+        
+        if (predSnapshot.empty) {
+            log('❌ No predictions found!');
+            return;
+        }
+        
+        const gwField = 'gameweek' + gameweek + 'Points';
+        log('Field to update: ' + gwField);
+        
+        let updatedCount = 0;
+        
+        for (const predDoc of predSnapshot.docs) {
+            const pred = predDoc.data();
+            log('<br>👤 User: ' + pred.userId);
+            log('Prediction: ' + pred.homeScore + '-' + pred.awayScore);
+            
+            let points = 0;
+            if (pred.homeScore === homeScore && pred.awayScore === awayScore) {
+                points = 5;
+                log('✅ Exact score! +5 points');
+            } else if (
+                (pred.homeScore > pred.awayScore && homeScore > awayScore) ||
+                (pred.homeScore < pred.awayScore && homeScore < awayScore) ||
+                (pred.homeScore === pred.awayScore && homeScore === awayScore)
+            ) {
+                points = 3;
+                log('✅ Correct outcome! +3 points');
+            } else {
+                log('❌ No points (wrong prediction)');
+            }
+            
+            if (points > 0) {
+                const usersRef = collection(db, 'users');
+                const userQuery = query(usersRef, where('userId', '==', pred.userId));
+                const userSnapshot = await getDocs(userQuery);
+                
+                if (userSnapshot.empty) {
+                    log('⚠️ User not found in database!');
+                    continue;
+                }
+                
+                userSnapshot.forEach(async userDoc => {
+                    const userData = userDoc.data();
+                    const currentPoints = userData[gwField] || 0;
+                    const newPoints = currentPoints + points;
+                    
+                    log('📝 User: ' + userData.displayName);
+                    log('Current ' + gwField + ': ' + currentPoints);
+                    log('New ' + gwField + ': ' + newPoints);
+                    
+                    await updateDoc(doc(db, 'users', userDoc.id), {
+                        [gwField]: newPoints
+                    });
+                    
+                    log('✅ Updated successfully!');
+                    updatedCount++;
+                });
+            }
+        }
+        
+        log('<br><strong style="color:#28a745;">✅ Complete! Updated ' + updatedCount + ' users</strong>');
+        
+    } catch (error) {
+        log('<br><strong style="color:#dc3545;">❌ Error: ' + error.message + '</strong>');
+    }
+            }
             
             console.log('3. Firebase initialized');
             document.getElementById('status').innerHTML = '✅ Connected!';
@@ -436,95 +525,7 @@
             document.getElementById('status').innerHTML = '❌ Error';
             document.body.innerHTML += '<div class="error-box" style="margin-top:20px;"><strong>Error:</strong><br>' + error.message + '</div>';
         }
-
-         // Calculate points for a match
-async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
-    const resultsDiv = document.createElement('div');
-    resultsDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);color:white;padding:20px;z-index:9999;overflow:auto;font-size:14px;';
-    resultsDiv.innerHTML = '<h3 style="margin-bottom:20px;"> Debugging Points Calculation</h3><div id="debug-content" style="background:#1a1a2e;padding:15px;border-radius:8px;"></div><button onclick="this.parentElement.remove()" style="margin-top:20px;padding:10px 20px;background:#667eea;color:white;border:none;border-radius:8px;">Close</button>';
-    document.body.appendChild(resultsDiv);
-    
-    const log = (msg) => {
-        document.getElementById('debug-content').innerHTML += '<div style="margin:5px 0;padding:5px;background:rgba(255,255,255,0.1);border-radius:4px;">' + msg + '</div>';
-    };
-    
-    try {
-        log('🎯 Starting calculation...');
-        log('Match ID: ' + matchId);
-        log('Score: ' + homeScore + '-' + awayScore);
-        log('Gameweek: ' + gameweek);
-        
-        const predRef = collection(db, 'predictions');
-        const predQuery = query(predRef, where('matchId', '==', matchId));
-        const predSnapshot = await getDocs(predQuery);
-        
-        log('📊 Found ' + predSnapshot.size + ' predictions');
-        
-        if (predSnapshot.empty) {
-            log('❌ No predictions found!');
-            return;
-        }
-        
-        const gwField = 'gameweek' + gameweek + 'Points';
-        log('Field to update: ' + gwField);
-        
-        let updatedCount = 0;
-        
-        for (const predDoc of predSnapshot.docs) {
-            const pred = predDoc.data();
-            log('<br>👤 User: ' + pred.userId);
-            log('Prediction: ' + pred.homeScore + '-' + pred.awayScore);
-            
-            let points = 0;
-            if (pred.homeScore === homeScore && pred.awayScore === awayScore) {
-                points = 5;
-                log('✅ Exact score! +5 points');
-            } else if (
-                (pred.homeScore > pred.awayScore && homeScore > awayScore) ||
-                (pred.homeScore < pred.awayScore && homeScore < awayScore) ||
-                (pred.homeScore === pred.awayScore && homeScore === awayScore)
-            ) {
-                points = 3;
-                log('✅ Correct outcome! +3 points');
-            } else {
-                log('❌ No points (wrong prediction)');
-            }
-            
-            if (points > 0) {
-                const usersRef = collection(db, 'users');
-                const userQuery = query(usersRef, where('userId', '==', pred.userId));
-                const userSnapshot = await getDocs(userQuery);
-                
-                if (userSnapshot.empty) {
-                    log('⚠️ User not found in database!');
-                    continue;
-                }
-                
-                userSnapshot.forEach(async userDoc => {
-                    const userData = userDoc.data();
-                    const currentPoints = userData[gwField] || 0;
-                    const newPoints = currentPoints + points;
-                    
-                    log('📝 User: ' + userData.displayName);
-                    log('Current ' + gwField + ': ' + currentPoints);
-                    log('New ' + gwField + ': ' + newPoints);
-                    
-                    await updateDoc(doc(db, 'users', userDoc.id), {
-                        [gwField]: newPoints
-                    });
-                    
-                    log('✅ Updated successfully!');
-                    updatedCount++;
-                });
-            }
-        }
-        
-        log('<br><strong style="color:#28a745;">✅ Complete! Updated ' + updatedCount + ' users</strong>');
-        
-    } catch (error) {
-        log('<br><strong style="color:#dc3545;">❌ Error: ' + error.message + '</strong>');
-    }
-}
+         
         
     </script>
 </body>
