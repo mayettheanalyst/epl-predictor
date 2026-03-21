@@ -570,9 +570,12 @@ div.innerHTML = `
                 }
             };
 
-async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
-    console.log('🔍 Calculating points for match:', matchId, 'GW' + gameweek);
-    console.log('📊 Final score:', homeScore, '-', awayScore);
+
+            
+            window.saveResultFromList = async function(matchId) {
+    console.log('🔍 saveResultFromList casync function calculatePoints(matchId, homeScore, awayScore, gameweek) {
+    console.log('🎯 calculatePoints called!');
+    console.log('Match:', matchId, 'Score:', homeScore, '-', awayScore, 'GW:', gameweek);
     
     try {
         const predRef = collection(db, 'predictions');
@@ -585,92 +588,80 @@ async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
             const pred = predDoc.data();
             let points = 0;
             
-            // Exact score = 5 points
             if (pred.homeScore === homeScore && pred.awayScore === awayScore) {
                 points = 5;
-                console.log('✅ Exact score! +5 pts for:', pred.userId);
-            }
-            // Correct outcome = 3 points
-            else if (
+            } else if (
                 (pred.homeScore > pred.awayScore && homeScore > awayScore) ||
                 (pred.homeScore < pred.awayScore && homeScore < awayScore) ||
                 (pred.homeScore === pred.awayScore && homeScore === awayScore)
             ) {
                 points = 3;
-                console.log('✅ Correct outcome! +3 pts for:', pred.userId);
             }
             
             if (points > 0) {
-                // Update user's gameweek points AND total points
                 const usersRef = collection(db, 'users');
                 const userQuery = query(usersRef, where('userId', '==', pred.userId));
                 const userSnapshot = await getDocs(userQuery);
                 
                 userSnapshot.forEach(async userDoc => {
                     const userData = userDoc.data();
-                    const userRef = doc(db, 'users', userDoc.id);
-                    
-                    // Get current gameweek points (create if doesn't exist)
                     const gwPointsField = `gameweek${gameweek}Points`;
-                    const gwWinsField = `gameweek${gameweek}Wins`;
                     
-                    const currentGWPoints = userData[gwPointsField] || 0;
-                    const currentGWWins = userData[gwWinsField] || 0;
-                    const currentTotalPoints = userData.totalPoints || 0;
-                    const currentTotalWins = userData.totalWins || 0;
-                    
-                    // Update both gameweek and total points
-                    await updateDoc(userRef, {
-                        [gwPointsField]: currentGWPoints + points,
-                        [gwWinsField]: currentGWWins + 1,
-                        totalPoints: currentTotalPoints + points,
-                        totalWins: currentTotalWins + 1
+                    await updateDoc(doc(db, 'users', userDoc.id), {
+                        [gwPointsField]: (userData[gwPointsField] || 0) + points,
+                        totalPoints: (userData.totalPoints || 0) + points
                     });
                     
-                    console.log('✅ Updated:', userData.displayName, '+', points, 'pts (GW' + gameweek + ')');
+                    console.log('✅ Updated', userData.displayName, '+', points, 'pts');
                 });
             }
         }
-        
-        console.log('✅ Points calculation complete!');
-        
     } catch (error) {
-        console.error('❌ Error calculating points:', error);
+        console.error('❌ Error in calculatePoints:', error);
     }
-}
-            
-            window.saveResultFromList = async function(matchId) {
+                    }alled for match:', matchId);
+    
     const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
     const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
+    
+    console.log('📊 Scores entered:', homeScore, '-', awayScore);
     
     if (isNaN(homeScore) || isNaN(awayScore)) {
         alert('Please enter both scores');
         return;
     }
     
-    // Get gameweek from the match
-    const matchDoc = await getDoc(doc(db, 'matches', matchId));
-    const matchData = matchDoc.data();
-    const gameweek = matchData.gameweek || currentGW;
-    
-    if (!confirm('Save result for GW' + gameweek + '?\nPoints will be calculated.')) {
-        return;
-    }
-    
     try {
+        // Get match data
+        const matchDoc = await getDoc(doc(db, 'matches', matchId));
+        const matchData = matchDoc.data();
+        const gameweek = matchData.gameweek || currentGW;
+        
+        console.log('📊 Match data:', matchData);
+        console.log('📊 Gameweek:', gameweek);
+        
+        // Update match
         await updateDoc(doc(db, 'matches', matchId), {
             realHomeScore: homeScore,
             realAwayScore: awayScore,
             status: 'finished'
         });
         
-        // Calculate points
-        await calculatePoints(matchId, homeScore, awayScore, gameweek);
+        console.log('✅ Match updated, now calculating points...');
         
-        alert('✅ Result saved & points calculated!\nCheck the leaderboard!');
+        // Call calculatePoints
+        if (typeof calculatePoints === 'function') {
+            await calculatePoints(matchId, homeScore, awayScore, gameweek);
+            console.log('✅ calculatePoints completed');
+        } else {
+            console.error('❌ calculatePoints function not found!');
+        }
+        
+        alert('✅ Result saved!');
         loadResultsSection();
         
     } catch (error) {
+        console.error('❌ Error in saveResultFromList:', error);
         alert('Error: ' + error.message);
     }
 };
