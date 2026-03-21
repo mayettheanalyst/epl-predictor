@@ -355,17 +355,37 @@
             };
             
             window.saveResult = async function(matchId) {
-                const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
-                const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
-                if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores'); return; }
-                try {
-                    await updateDoc(doc(db, 'matches', matchId), { realHomeScore: homeScore, realAwayScore: awayScore, status: 'finished' });
-                    alert('✅ Result saved!');
-                    loadResultsSection();
-                } catch (error) {
-                    alert('Error: ' + error.message);
-                }
-            };
+    const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
+    const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
+    
+    if (isNaN(homeScore) || isNaN(awayScore)) { 
+        alert('Enter both scores'); 
+        return; 
+    }
+    
+    try {
+        // Get match data to find gameweek
+        const matchDoc = await getDoc(doc(db, 'matches', matchId));
+        const matchData = matchDoc.data();
+        const gameweek = matchData.gameweek || currentGW;
+        
+        // Update match result
+        await updateDoc(doc(db, 'matches', matchId), { 
+            realHomeScore: homeScore, 
+            realAwayScore: awayScore, 
+            status: 'finished' 
+        });
+        
+        // Calculate points
+        await calculatePoints(matchId, homeScore, awayScore, gameweek);
+        
+        alert('✅ Result saved & points calculated!');
+        loadResultsSection();
+        
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+};
             
             // Navigation
             window.showTab = function(tab) {
