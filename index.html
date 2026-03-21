@@ -10,6 +10,7 @@
         body { font-family: Arial, sans-serif; background: #f2f2f7; padding: 20px; padding-bottom: 80px; }
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; }
         .header h1 { font-size: 26px; margin-bottom: 5px; text-align: center; }
+        .error-box { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 10px 0; }
         .match-card { background: white; border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .date-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 15px; border-radius: 10px; margin: 15px 0 10px; font-weight: bold; }
         .match-row { display: flex; align-items: center; padding: 15px; }
@@ -19,9 +20,7 @@
         .team-name { font-weight: 600; font-size: 15px; }
         .team-score { font-weight: bold; font-size: 18px; color: #667eea; }
         .match-footer { background: #f8f9fa; padding: 8px 15px; border-top: 1px solid #eee; display: flex; justify-content: space-between; font-size: 13px; color: #666; }
-        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin: 10px 0; }
-        .warning { background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 10px 0; }
-        .success { background: #d4edda; color: #155724; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .prediction-box { background: #e7f3ff; padding: 8px 15px; margin: 5px 15px; border-radius: 6px; font-size: 13px; }
         .nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; padding: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); gap: 5px; }
         .nav button { flex: 1; background: #f2f2f7; color: #666; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
         .nav button.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
@@ -29,14 +28,7 @@
         .page.active { display: block; }
         button.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; margin: 5px 0; cursor: pointer; }
         button.success { background: #28a745; }
-        button.danger { background: #dc3545; }
         input, select { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-        .modal.active { display: flex; }
-        .modal-content { background: white; border-radius: 16px; padding: 25px; width: 90%; max-width: 400px; }
-        .modal-header { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }
-        .prediction-inputs { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 20px 0; }
-        .prediction-inputs input { width: 80px; text-align: center; font-size: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -46,65 +38,43 @@
     </div>
 
     <div id="matches-page" class="page active">
-        <h2 style="text-align:center;margin-bottom:15px;">
-            <button onclick="changeGW(-1)" style="width:40px;border:none;background:#667eea;color:white;border-radius:8px;">◀</button>            Gameweek <span id="gw-num">31</span>
+        <h2 style="text-align:center;margin:15px 0;">
+            <button onclick="changeGW(-1)" style="width:40px;border:none;background:#667eea;color:white;border-radius:8px;">◀</button>
+            Gameweek <span id="gw-num">31</span>
             <button onclick="changeGW(1)" style="width:40px;border:none;background:#667eea;color:white;border-radius:8px;">▶</button>
         </h2>
         <div id="matches-list"></div>
     </div>
 
     <div id="leaderboard-page" class="page">
-        <h2 style="margin-bottom:15px;">🏆 Leaderboard</h2>
-        <div id="leaderboard-list"></div>
+        <h2 style="margin:15px 0;">🏆 Leaderboard - GW<span id="lb-gw">31</span></h2>        <div id="leaderboard-list"></div>
     </div>
 
     <div id="profile-page" class="page">
-        <h2 style="margin-bottom:15px;">👤 Profile</h2>
+        <h2 style="margin:15px 0;">👤 Profile</h2>
         <div id="profile-list"></div>
     </div>
 
     <div id="admin-page" class="page">
-        <h2 style="margin-bottom:15px;">⚙️ Admin</h2>
+        <h2 style="margin:15px 0;">⚙️ Admin</h2>
         <div id="admin-login">
             <input type="password" id="admin-pass" placeholder="Password">
-            <button class="primary" onclick="checkAdmin(event)">Login</button>
+            <button class="primary" onclick="checkAdmin()">Login</button>
         </div>
-        <div id="admin-panel" style="display:none;margin-top:20px;">
+        <div id="admin-panel" style="display:none;">
             <button class="primary success" onclick="showAdmin('add')">Add Match</button>
             <button class="primary" onclick="showAdmin('results')">Enter Results</button>
-            <button class="primary" onclick="showAdmin('users')">Manage Users</button>
-            <button class="primary danger" onclick="logoutAdmin()">Logout</button>
-            <div id="admin-add" style="display:none;margin-top:10px;">
-                <input id="a-gw" type="number" placeholder="Gameweek" value="31">
+            <button class="primary" onclick="logoutAdmin()">Logout</button>
+            <div id="admin-add" style="display:none;margin:10px 0;">
                 <input id="a-home" placeholder="Home Team">
                 <input id="a-away" placeholder="Away Team">
                 <input id="a-stadium" placeholder="Stadium">
                 <input type="datetime-local" id="a-kickoff">
                 <button class="primary success" onclick="addMatch()">Add</button>
             </div>
-            <div id="admin-results" style="display:none;margin-top:10px;">
+            <div id="admin-results" style="display:none;margin:10px 0;">
                 <div id="results-list"></div>
             </div>
-            <div id="admin-users" style="display:none;margin-top:10px;">
-                <input id="u-name" placeholder="Display Name">
-                <input id="u-username" placeholder="Username">
-                <select id="u-paid"><option value="false">Not Paid</option><option value="true">Paid</option></select>
-                <button class="primary success" onclick="createUser()">Create User</button>
-                <div id="users-list" style="margin-top:20px;"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="prediction-modal" class="modal">
-        <div class="modal-content">            <div class="modal-header">🔮 Prediction</div>
-            <div id="prediction-match-info" style="text-align:center;margin-bottom:20px;font-weight:bold;"></div>
-            <div class="prediction-inputs">
-                <input type="number" id="pred-home" min="0" max="20" placeholder="0">
-                <span>-</span>
-                <input type="number" id="pred-away" min="0" max="20" placeholder="0">
-            </div>
-            <button class="primary success" onclick="submitPrediction()">Submit</button>
-            <button class="primary" onclick="closeModal()" style="margin-top:10px;background:#6c757d;">Cancel</button>
         </div>
     </div>
 
@@ -116,17 +86,17 @@
     </div>
 
     <script type="module">
-        console.log('🔍 Script starting...');
-        document.getElementById('status').innerHTML = '📦 Loading Firebase...';
-        
         try {
+            console.log('1. Starting...');
+            document.getElementById('status').innerHTML = '📦 Loading...';
+            
             const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-            const { getFirestore, collection, getDocs, query, where, orderBy, addDoc, doc, updateDoc, deleteDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            const { getFirestore, collection, getDocs, query, where, addDoc, doc, updateDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            console.log('✅ Firebase imported');
-            document.getElementById('status').innerHTML = '🔥 Initializing Firebase...';
+            console.log('2. Firebase loaded');
+            document.getElementById('status').innerHTML = '🔥 Firebase...';
             
-            const firebaseConfig = {
+            const firebaseConfig = {                apiKey: "AIzaSy...",  // ⚠️ REPLACE WITH YOURS
                 apiKey: "AIzaSyAaqYXuYEg_pIPMHfbz7i1jcVCgeGJ_4zs",
   authDomain: "epl-predictor-ae53f.firebaseapp.com",
   projectId: "epl-predictor-ae53f",
@@ -138,16 +108,14 @@
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
             
-            console.log('✅ Firebase initialized');
+            console.log('3. Firebase initialized');
             document.getElementById('status').innerHTML = '✅ Connected!';
             
-            // Telegram
             const tg = window.Telegram.WebApp;
             tg.expand();
             tg.ready();
-            const user = tg.initDataUnsafe?.user;            const userId = user?.id?.toString() || null;
-            
-            console.log('🔍 Telegram user ID:', userId);
+            const user = tg.initDataUnsafe?.user;
+            const userId = user?.id?.toString() || null;
             
             let currentGW = 31;
             let isAdmin = false;
@@ -155,20 +123,18 @@
             
             // Load Matches
             async function loadMatches() {
-                console.log('🔍 Loading matches for GW' + currentGW);
-                const container = document.getElementById('matches-list');
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                
                 try {
+                    const container = document.getElementById('matches-list');
+                    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                    
                     const matchesRef = collection(db, 'matches');
                     const q = query(matchesRef, where('gameweek', '==', currentGW));
                     const snapshot = await getDocs(q);
                     
-                    console.log('📊 Found', snapshot.size, 'matches');
                     container.innerHTML = '';
                     
                     if (snapshot.empty) {
-                        container.innerHTML = '<div class="warning">⚠️ No matches for GW' + currentGW + '</div>';
+                        container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No matches</div>';
                         return;
                     }
                     
@@ -180,8 +146,7 @@
                         predSnap.forEach(d => { userPreds[d.data().matchId] = d.data(); });
                     }
                     
-                    const byDate = {};
-                    snapshot.forEach(docSnap => {
+                    const byDate = {};                    snapshot.forEach(docSnap => {
                         const m = docSnap.data();
                         let dateKey = 'Unknown';
                         if (m.kickoffTime) {
@@ -194,7 +159,8 @@
                     
                     Object.keys(byDate).sort().forEach(dateStr => {
                         const header = document.createElement('div');
-                        header.className = 'date-header';                        header.textContent = dateStr;
+                        header.className = 'date-header';
+                        header.textContent = dateStr;
                         container.appendChild(header);
                         
                         byDate[dateStr].forEach(match => {
@@ -208,57 +174,39 @@
                                 timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                             }
                             
-                           // Inside loadMatches, where you create the match card:
-
-const isDone = m.status === 'finished';
-const userPred = userPreds[match.id];
-
-                            console.log('🔍 Match:', m.homeTeam, 'vs', m.awayTeam, '- Match ID:', match.id);
-console.log('🔍 userPred:', userPred);
-console.log('🔍 All userPreds:', userPreds);
-
-div.innerHTML = `
-    <div class="match-row">
-        <div class="match-time">${timeStr}</div>
-        <div class="match-teams">
-            <div class="team-row">
-                <span class="team-name">${m.homeTeam}</span>
-                <span class="team-score" style="${isDone ? 'color:#dc3545;font-size:20px;' : 'color:#667eea;font-size:18px;'}">
-                    ${isDone ? m.realHomeScore : (userPred ? userPred.homeScore : '-')}
-                </span>
-            </div>
-            <div class="team-row">
-                <span class="team-name">${m.awayTeam}</span>
-                <span class="team-score" style="${isDone ? 'color:#dc3545;font-size:20px;' : 'color:#667eea;font-size:18px;'}">
-                    ${isDone ? m.realAwayScore : (userPred ? userPred.awayScore : '-')}
-                </span>
-            </div>
-        </div>
-    </div>
-    
-    ${userPred ? `
-        <div style="background:#e7f3ff;padding:8px 15px;margin:5px 15px;border-radius:6px;font-size:13px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span>🔮 Your prediction:</span>
-                <span style="font-weight:bold;color:#2481cc;font-size:15px;">
-                    ${userPred.homeScore} - ${userPred.awayScore}
-                </span>
-            </div>
-        </div>
-    ` : ''}
-    
-    <div class="match-footer">
-        <span>📍 ${m.stadium || 'TBD'}</span>
-        ${isDone ? `
-            <div style="text-align:right;">
-                <div style="font-weight:bold;color:#dc3545;font-size:16px;">Real Result</div>
-                <div style="color:#28a745;font-weight:bold;">✅ Finished</div>
-            </div>
-        ` : `
-            <span style="color:#667eea;font-weight:bold;">🔮 Predict</span>
-        `}
-    </div>
-`;
+                            const isDone = m.status === 'finished';
+                            const userPred = userPreds[match.id];
+                            
+                            div.innerHTML = `
+                                <div class="match-row">
+                                    <div class="match-time">${timeStr}</div>
+                                    <div class="match-teams">
+                                        <div class="team-row">
+                                            <span class="team-name">${m.homeTeam}</span>
+                                            <span class="team-score" style="${isDone ? 'color:#dc3545;font-size:20px;' : 'color:#667eea;font-size:18px;'}">
+                                                ${isDone ? m.realHomeScore : (userPred ? userPred.homeScore : '-')}
+                                            </span>
+                                        </div>
+                                        <div class="team-row">
+                                            <span class="team-name">${m.awayTeam}</span>
+                                            <span class="team-score" style="${isDone ? 'color:#dc3545;font-size:20px;' : 'color:#667eea;font-size:18px;'}">
+                                                ${isDone ? m.realAwayScore : (userPred ? userPred.awayScore : '-')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                ${userPred ? `                                    <div class="prediction-box">
+                                        <div style="display:flex;justify-content:space-between;">
+                                            <span>🔮 Your prediction:</span>
+                                            <span style="font-weight:bold;color:#2481cc;">${userPred.homeScore} - ${userPred.awayScore}</span>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                <div class="match-footer">
+                                    <span>📍 ${m.stadium || 'TBD'}</span>
+                                    ${isDone ? '<span style="color:#28a745;font-weight:bold;">✅ Finished</span>' : '<span style="color:#667eea;font-weight:bold;">🔮 Predict</span>'}
+                                </div>
+                            `;
                             
                             if (!isDone && !isAdmin && userId) {
                                 div.style.cursor = 'pointer';
@@ -271,275 +219,113 @@ div.innerHTML = `
                                 };
                             }
                             
-                            container.appendChild(div);                        });
+                            container.appendChild(div);
+                        });
                     });
                 } catch (error) {
-                    console.error('❌ Error loading matches:', error);
-                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+                    console.error('Error:', error);
+                    document.getElementById('matches-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
                 }
             }
             
-            // Leaderboard
-            
-            
+            // Simple Leaderboard
             async function loadLeaderboard() {
-    const container = document.getElementById('leaderboard-list');
-    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-    
-    try {
-        // Get ALL users
-        const usersRef = collection(db, 'users');
-        const snapshot = await getDocs(usersRef);
-        
-        container.innerHTML = '';
-        
-        if (snapshot.empty) {
-            container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No users yet</div>';
-            return;
-        }
-        
-        // Convert to array
-        const usersArray = [];
-        snapshot.forEach(docSnap => {
-            const userData = docSnap.data();
+                try {
+                    const container = document.getElementById('leaderboard-list');
+                    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                    
+                    const usersRef = collection(db, 'users');
+                    const snapshot = await getDocs(usersRef);
+                    
+                    container.innerHTML = '';
+                    
+                    if (snapshot.empty) {
+                        container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No users</div>';
+                        return;
+                    }
+                    
+                    const usersArray = [];                    snapshot.forEach(docSnap => {
+                        usersArray.push(docSnap.data());
+                    });
+                    
+                    usersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+                    
+                    let rank = 1;
+                    usersArray.forEach(u => {
+                        const div = document.createElement('div');
+                        div.className = 'match-card';
+                        div.style.padding = '15px';
+                        div.innerHTML = `<div style="display:flex;justify-content:space-between;"><div><strong>${rank}. ${u.displayName||'User'}</strong></div><div>${u.totalPoints||0} pts</div></div>`;
+                        container.appendChild(div);
+                        rank++;
+                    });
+                } catch (error) {
+                    document.getElementById('leaderboard-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
+                }
+            }
             
-            // Get gameweek points (for currentGW)
-            const gwPointsField = `gameweek${currentGW}Points`;
-            const gwWinsField = `gameweek${currentGW}Wins`;
-            
-            usersArray.push({
-                id: docSnap.id,
-                displayName: userData.displayName || 'User',
-                gwPoints: userData[gwPointsField] || 0,
-                gwWins: userData[gwWinsField] || 0,
-                totalPoints: userData.totalPoints || 0,
-                totalWins: userData.totalWins || 0
-            });
-        });
-        
-        // Sort by gameweek points (descending)
-        usersArray.sort((a, b) => b.gwPoints - a.gwPoints);
-        
-        // Display
-        let rank = 1;
-        usersArray.forEach(u => {
-            const div = document.createElement('div');
-            div.style.cssText = 'background:white;border-radius:12px;padding:15px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);';
-            
-            let rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank + '.';
-            
-            div.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <span style="font-size:20px;">${rankIcon}</span>
-                        <div>
-                            <div style="font-weight:bold;font-size:16px;">${u.displayName}</div>
-                            <div style="font-size:12px;color:#666;">GW${currentGW}: ${u.gwPoints} pts | Total: ${u.totalPoints} pts</div>
-                        </div>
-                    </div>
-                    <div style="font-size:20px;font-weight:bold;color:#667eea;">${u.gwPoints} pts</div>
-                </div>
-            `;
-            container.appendChild(div);
-            rank++;
-        });
-        
-    } catch (error) {
-        console.error('❌ Error loading leaderboard:', error);
-        container.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
-    }
-                           }
             // Profile
             async function loadProfile() {
-    const container = document.getElementById('profile-list');
-    
-    console.log('🔍 loadProfile called, userId:', userId);
-    
-    if (!userId) {
-        container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">Open from Telegram to view profile</div>';
-        return;
-    }
-    
-    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-    
-    try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('userId', '==', userId));
-        const snapshot = await getDocs(q);
-        
-        console.log('📊 Profile query found:', snapshot.size, 'documents');
-        
-        if (snapshot.empty) {
-            console.log('📝 Creating new user profile...');
-            
-            const newUser = {
-                userId: userId,
-                displayName: user?.first_name || user?.username || 'User',
-                username: user?.username || '',
-                favoriteTeam: '',
-                totalPoints: 0,
-                totalWins: 0,
-                totalLosses: 0,
-                isPaid: false,
-                createdAt: new Date(),
-                isTelegramUser: true
-            };
-            
-            console.log('💾 New user data:', newUser);
-            
-            await addDoc(usersRef, newUser);
-            
-            console.log('✅ User created successfully!');
-            
-            container.innerHTML = `
-                <div style="background:#d4edda;color:#155724;padding:15px;border-radius:8px;">
-                    ✅ Profile created!<br><br>
-                    Welcome, ${newUser.displayName}!
-                </div>
-            `;
-            
-            // Reload profile after 2 seconds
-            setTimeout(() => loadProfile(), 2000);
-            return;
-        }
-        
-        // Existing user
-        const u = snapshot.docs[0].data();
-        console.log('✅ Existing user loaded:', u.displayName);
-        
-        container.innerHTML = `
-            <div style="background:white;border-radius:12px;padding:20px;">
-                <h3 style="text-align:center;margin-bottom:15px;">👤 ${u.displayName}</h3>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#667eea;">${u.totalPoints||0}</div>
-                        <div style="font-size:12px;">Points</div>
-                    </div>
-                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#28a745;">${u.totalWins||0}</div>
-                        <div style="font-size:12px;">Wins</div>
-                    </div>
-                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                        <div style="font-size:24px;font-weight:bold;color:#dc3545;">${u.totalLosses||0}</div>
-                        <div style="font-size:12px;">Losses</div>
-                    </div>
-                    <div style="text-align:center;padding:15px;background:#f8f9fa;border-radius:8px;">
-                        <div style="font-size:24px;">${u.isPaid?'✅':'❌'}</div>
-                        <div style="font-size:12px;">Paid</div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-    } catch (error) {
-        console.error('❌ Error in loadProfile:', error);
-        container.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
-    }
-}
-            
-            // Submit Prediction
-            window.submitPrediction = async function() {
-                const homeScore = parseInt(document.getElementById('pred-home').value);
-                const awayScore = parseInt(document.getElementById('pred-away').value);
-                
-                if (isNaN(homeScore) || isNaN(awayScore)) { 
-                    alert('Please enter both scores'); 
-                    return; 
+                const container = document.getElementById('profile-list');
+                if (!userId) {
+                    container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">Open from Telegram</div>';
+                    return;
                 }
-                
+                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
                 try {
-                    const matchDoc = await getDoc(doc(db, 'matches', currentMatchId));
-                    const matchData = matchDoc.data();
-                    
-                    if (matchData.kickoffTime) {
-                        const kickoff = matchData.kickoffTime.toDate ? matchData.kickoffTime.toDate() : new Date(matchData.kickoffTime);
-                        if (new Date() > kickoff) {
-                            alert('❌ Cannot submit after match started!');
-                            return;
-                        }
+                    const usersRef = collection(db, 'users');
+                    const q = query(usersRef, where('userId', '==', userId));
+                    const snapshot = await getDocs(q);
+                    if (snapshot.empty) {
+                        await addDoc(usersRef, { userId, displayName: user?.first_name||'User', totalPoints:0, totalWins:0, totalLosses:0, isPaid:false, createdAt:new Date() });
+                        container.innerHTML = '<div style="background:#d4edda;color:#155724;padding:15px;border-radius:8px;">✅ Profile created!</div>';
+                        return;
                     }
-                    
-                    const predRef = collection(db, 'predictions');
-                    const existingQuery = query(predRef, where('userId', '==', userId), where('matchId', '==', currentMatchId));
-                    const existingSnap = await getDocs(existingQuery);
-                    
-                    if (!existingSnap.empty) {
-                        const predDoc = existingSnap.docs[0];
-                        await updateDoc(doc(db, 'predictions', predDoc.id), { homeScore, awayScore, updatedAt: new Date() });
-                        alert('✅ Prediction updated!');
-                    } else {
-                        await addDoc(predRef, { userId, matchId: currentMatchId, gameweek: currentGW, homeScore, awayScore, submittedAt: new Date() });
-                        alert('✅ Prediction submitted!');
-                    }
-                    
-                    closeModal();
-                    loadMatches();
-                } catch (error) {                    alert('Error: ' + error.message);
+                    const u = snapshot.docs[0].data();
+                    container.innerHTML = '<div style="background:white;border-radius:12px;padding:20px;text-align:center;"><h3>👤 ' + u.displayName + '</h3><div style="font-size:24px;font-weight:bold;color:#667eea;margin-top:10px;">' + (u.totalPoints||0) + ' points</div></div>';
+                } catch (error) {
+                    container.innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
                 }
-            };
-            
-            window.closeModal = function() { 
-                document.getElementById('prediction-modal').classList.remove('active'); 
-            };
+            }
             
             // Admin
-            window.checkAdmin = function(event) {
-    // Prevent default form submission
-    if (event) {
-        event.preventDefault();
-    }
-    
-    console.log('🔍 Admin login attempt...');
-    
-    const password = document.getElementById('admin-pass').value;
-    
-    if (password === 'admin123') {
-        console.log('✅ Admin login successful');
-        isAdmin = true;
-        document.getElementById('admin-login').style.display = 'none';
-        document.getElementById('admin-panel').style.display = 'block';
-        
-        // Show success message
-        alert('✅ Admin login successful!');
-        
-        // Load admin data
-        loadAllUsers();
-    } else {
-        console.log('❌ Wrong password');
-        alert('❌ Wrong password!\n\nDefault: admin123');
-    }
-};
+            window.checkAdmin = function() {
+                if (document.getElementById('admin-pass').value === 'admin123') {
+                    isAdmin = true;
+                    document.getElementById('admin-login').style.display = 'none';
+                    document.getElementById('admin-panel').style.display = 'block';                    alert('✅ Admin login!');
+                } else {
+                    alert('❌ Wrong password!');
+                }
+            };
             
             window.logoutAdmin = function() {
                 isAdmin = false;
                 document.getElementById('admin-login').style.display = 'block';
                 document.getElementById('admin-panel').style.display = 'none';
-                document.getElementById('admin-pass').value = '';
             };
             
             window.showAdmin = function(section) {
-                ['add', 'results', 'users'].forEach(s => {
+                ['add', 'results'].forEach(s => {
                     const el = document.getElementById('admin-' + s);
                     if (el) el.style.display = s === section ? 'block' : 'none';
                 });
                 if (section === 'results') loadResultsSection();
-                if (section === 'users') loadAllUsers();
             };
             
             window.addMatch = async function() {
                 try {
-                    const home = document.getElementById('a-home').value;
-                    const away = document.getElementById('a-away').value;
-                    const stadium = document.getElementById('a-stadium').value;
-                    const gw = parseInt(document.getElementById('a-gw').value);
-                    const kickoff = document.getElementById('a-kickoff').value;
-                    
-                    if (!home || !away || !kickoff) {
-                        alert('Please fill all required fields');
-                        return;
-                    }
-                                        await addDoc(collection(db, 'matches'), { homeTeam: home, awayTeam: away, stadium: stadium, gameweek: gw, kickoffTime: new Date(kickoff), status: 'scheduled', realHomeScore: null, realAwayScore: null, createdAt: new Date() });
-                    
+                    await addDoc(collection(db, 'matches'), {
+                        homeTeam: document.getElementById('a-home').value,
+                        awayTeam: document.getElementById('a-away').value,
+                        stadium: document.getElementById('a-stadium').value,
+                        gameweek: parseInt(document.getElementById('a-gw').value),
+                        kickoffTime: new Date(document.getElementById('a-kickoff').value),
+                        status: 'scheduled',
+                        realHomeScore: null,
+                        realAwayScore: null,
+                        createdAt: new Date()
+                    });
                     alert('✅ Match added!');
                     document.getElementById('a-home').value = '';
                     document.getElementById('a-away').value = '';
@@ -552,154 +338,33 @@ div.innerHTML = `
                 const container = document.getElementById('results-list');
                 container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
                 try {
-                    const gw = parseInt(document.getElementById('results-gw')?.value) || currentGW;
-                    const snapshot = await getDocs(query(collection(db, 'matches'), where('gameweek', '==', gw)));
+                    const snapshot = await getDocs(query(collection(db, 'matches'), where('gameweek', '==', currentGW)));
                     container.innerHTML = '';
-                    if (snapshot.empty) { container.innerHTML = '<div class="warning">No matches</div>'; return; }
+                    if (snapshot.empty) { container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No matches</div>'; return; }
                     snapshot.forEach(docSnap => {
-                        const m = docSnap.data();
-                        const div = document.createElement('div');
+                        const m = docSnap.data();                        const div = document.createElement('div');
                         div.className = 'match-card';
                         div.style.marginBottom = '10px';
                         div.style.padding = '15px';
-                        div.innerHTML = `<div style="font-weight:bold;margin-bottom:10px;">${m.homeTeam} vs ${m.awayTeam}</div><div style="display:flex;gap:10px;"><input type="number" id="score-${docSnap.id}-home" placeholder="Home" value="${m.realHomeScore??''}" style="flex:1;"><input type="number" id="score-${docSnap.id}-away" placeholder="Away" value="${m.realAwayScore??''}" style="flex:1;"></div><button class="primary success" onclick="saveResultFromList('${docSnap.id}')" style="margin-top:10px;">Save</button>`;
+                        div.innerHTML = `<div style="font-weight:bold;margin-bottom:10px;">${m.homeTeam} vs ${m.awayTeam}</div><div style="display:flex;gap:10px;"><input type="number" id="score-${docSnap.id}-home" placeholder="Home" value="${m.realHomeScore??''}" style="flex:1;"><input type="number" id="score-${docSnap.id}-away" placeholder="Away" value="${m.realAwayScore??''}" style="flex:1;"></div><button class="primary success" onclick="saveResult('${docSnap.id}')" style="margin-top:10px;">Save</button>`;
                         container.appendChild(div);
                     });
                 } catch (error) {
-                    container.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+                    container.innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
                 }
             };
-
-
             
-            window.saveResultFromList = async function(matchId) {
-    console.log('🔍 saveResultFromList casync function calculatePoints(matchId, homeScore, awayScore, gameweek) {
-    console.log('🎯 calculatePoints called!');
-    console.log('Match:', matchId, 'Score:', homeScore, '-', awayScore, 'GW:', gameweek);
-    
-    try {
-        const predRef = collection(db, 'predictions');
-        const predQuery = query(predRef, where('matchId', '==', matchId));
-        const predSnapshot = await getDocs(predQuery);
-        
-        console.log('📊 Found', predSnapshot.size, 'predictions');
-        
-        for (const predDoc of predSnapshot.docs) {
-            const pred = predDoc.data();
-            let points = 0;
-            
-            if (pred.homeScore === homeScore && pred.awayScore === awayScore) {
-                points = 5;
-            } else if (
-                (pred.homeScore > pred.awayScore && homeScore > awayScore) ||
-                (pred.homeScore < pred.awayScore && homeScore < awayScore) ||
-                (pred.homeScore === pred.awayScore && homeScore === awayScore)
-            ) {
-                points = 3;
-            }
-            
-            if (points > 0) {
-                const usersRef = collection(db, 'users');
-                const userQuery = query(usersRef, where('userId', '==', pred.userId));
-                const userSnapshot = await getDocs(userQuery);
-                
-                userSnapshot.forEach(async userDoc => {
-                    const userData = userDoc.data();
-                    const gwPointsField = `gameweek${gameweek}Points`;
-                    
-                    await updateDoc(doc(db, 'users', userDoc.id), {
-                        [gwPointsField]: (userData[gwPointsField] || 0) + points,
-                        totalPoints: (userData.totalPoints || 0) + points
-                    });
-                    
-                    console.log('✅ Updated', userData.displayName, '+', points, 'pts');
-                });
-            }
-        }
-    } catch (error) {
-        console.error('❌ Error in calculatePoints:', error);
-    }
-                    }alled for match:', matchId);
-    
-    const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
-    const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
-    
-    console.log('📊 Scores entered:', homeScore, '-', awayScore);
-    
-    if (isNaN(homeScore) || isNaN(awayScore)) {
-        alert('Please enter both scores');
-        return;
-    }
-    
-    try {
-        // Get match data
-        const matchDoc = await getDoc(doc(db, 'matches', matchId));
-        const matchData = matchDoc.data();
-        const gameweek = matchData.gameweek || currentGW;
-        
-        console.log('📊 Match data:', matchData);
-        console.log('📊 Gameweek:', gameweek);
-        
-        // Update match
-        await updateDoc(doc(db, 'matches', matchId), {
-            realHomeScore: homeScore,
-            realAwayScore: awayScore,
-            status: 'finished'
-        });
-        
-        console.log('✅ Match updated, now calculating points...');
-        
-        // Call calculatePoints
-        if (typeof calculatePoints === 'function') {
-            await calculatePoints(matchId, homeScore, awayScore, gameweek);
-            console.log('✅ calculatePoints completed');
-        } else {
-            console.error('❌ calculatePoints function not found!');
-        }
-        
-        alert('✅ Result saved!');
-        loadResultsSection();
-        
-    } catch (error) {
-        console.error('❌ Error in saveResultFromList:', error);
-        alert('Error: ' + error.message);
-    }
-};
-
-            
-            window.createUser = async function() {
-                const name = document.getElementById('u-name').value.trim();
-                if (!name) { alert('Enter name'); return; }
+            window.saveResult = async function(matchId) {
+                const homeScore = parseInt(document.getElementById(`score-${matchId}-home`).value);
+                const awayScore = parseInt(document.getElementById(`score-${matchId}-away`).value);
+                if (isNaN(homeScore) || isNaN(awayScore)) { alert('Enter both scores'); return; }
                 try {
-                    const newUserId = 'manual_' + Date.now();                    await addDoc(collection(db, 'users'), { userId: newUserId, displayName: name, username: document.getElementById('u-username').value||'', totalPoints:0, totalWins:0, totalLosses:0, isPaid: document.getElementById('u-paid').value==='true', createdAt: new Date(), isTelegramUser: false });
-                    alert('✅ User created!\n\nUser ID: ' + newUserId);
-                    document.getElementById('u-name').value = '';
-                    loadAllUsers();
-                } catch (error) { alert('Error: ' + error.message); }
-            };
-            
-            window.loadAllUsers = async function() {
-                const container = document.getElementById('users-list');
-                container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                try {
-                    const snapshot = await getDocs(collection(db, 'users'));
-                    container.innerHTML = '';
-                    snapshot.forEach(docSnap => {
-                        const u = docSnap.data();
-                        const div = document.createElement('div');
-                        div.className = 'match-card';
-                        div.style.marginBottom = '10px';
-                        div.style.padding = '15px';
-                        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${u.displayName||'User'}</strong><br><small>${u.isTelegramUser!==false?'📱 Telegram':'👤 Manual'} | ${u.isPaid?'✅ Paid':'❌'} | ${u.totalPoints||0} pts</small></div><button onclick="deleteUser('${docSnap.id}')" style="padding:5px 10px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">Delete</button></div>`;
-                        container.appendChild(div);
-                    });
-                } catch (error) { container.innerHTML = '<div class="error">Error: ' + error.message + '</div>'; }
-            };
-            
-            window.deleteUser = async function(uid) {
-                if (!confirm('Delete this user?')) return;
-                try { await deleteDoc(doc(db, 'users', uid)); alert('✅ Deleted!'); loadAllUsers(); }
-                catch (error) { alert('Error: ' + error.message); }
+                    await updateDoc(doc(db, 'matches', matchId), { realHomeScore: homeScore, realAwayScore: awayScore, status: 'finished' });
+                    alert('✅ Result saved!');
+                    loadResultsSection();
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
             
             // Navigation
@@ -717,14 +382,17 @@ div.innerHTML = `
                 currentGW += delta;
                 if (currentGW < 1) currentGW = 1;
                 document.getElementById('gw-num').textContent = currentGW;
+                document.getElementById('lb-gw').textContent = currentGW;
                 loadMatches();
             };
             
-            console.log('✅ App ready, loading matches...');            loadMatches();
+            console.log('✅ Ready!');
+            await loadMatches();
             
         } catch (error) {
             console.error('🚨 FATAL ERROR:', error);
-            document.getElementById('status').innerHTML = '❌ Error: ' + error.message;
+            document.getElementById('status').innerHTML = '❌ Error';
+            document.body.innerHTML += '<div class="error-box" style="margin-top:20px;"><strong>Error:</strong><br>' + error.message + '</div>';
         }
     </script>
 </body>
