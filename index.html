@@ -213,6 +213,10 @@
 const isDone = m.status === 'finished';
 const userPred = userPreds[match.id];
 
+                            console.log('🔍 Match:', m.homeTeam, 'vs', m.awayTeam, '- Match ID:', match.id);
+console.log('🔍 userPred:', userPred);
+console.log('🔍 All userPreds:', userPreds);
+
 div.innerHTML = `
     <div class="match-row">
         <div class="match-time">${timeStr}</div>
