@@ -439,48 +439,36 @@
 
          // Calculate points for a match
 async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
-    console.log('🎯 calculatePoints called');
-    console.log('Match ID:', matchId);
-    console.log('Score:', homeScore, '-', awayScore);
-    console.log('Gameweek:', gameweek);
+    alert('Starting points calculation...\nMatch: ' + matchId + '\nScore: ' + homeScore + '-' + awayScore);
     
     try {
-        // Check predictions
         const predRef = collection(db, 'predictions');
-        console.log('Collection:', predRef);
-        
         const predQuery = query(predRef, where('matchId', '==', matchId));
         const predSnapshot = await getDocs(predQuery);
         
-        console.log('📊 Found', predSnapshot.size, 'predictions for this match');
+        alert('Found ' + predSnapshot.size + ' predictions');
         
         if (predSnapshot.empty) {
-            console.log('⚠️ No predictions found!');
-            alert('⚠️ No predictions found for this match!\nPoints cannot be calculated.');
+            alert('No predictions found for this match!');
             return;
         }
         
         const gwField = 'gameweek' + gameweek + 'Points';
-        console.log('Gameweek field:', gwField);
+        let updatedCount = 0;
         
         for (const predDoc of predSnapshot.docs) {
             const pred = predDoc.data();
-            console.log('Processing prediction for user:', pred.userId);
-            console.log('Prediction:', pred.homeScore, '-', pred.awayScore);
+            alert('Checking prediction for user: ' + pred.userId);
             
             let points = 0;
-            
             if (pred.homeScore === homeScore && pred.awayScore === awayScore) {
                 points = 5;
-                console.log('✅ Exact score! +5 points');
-            }
-            else if (
+            } else if (
                 (pred.homeScore > pred.awayScore && homeScore > awayScore) ||
                 (pred.homeScore < pred.awayScore && homeScore < awayScore) ||
                 (pred.homeScore === pred.awayScore && homeScore === awayScore)
             ) {
                 points = 3;
-                console.log('✅ Correct outcome! +3 points');
             }
             
             if (points > 0) {
@@ -489,34 +477,27 @@ async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
                 const userSnapshot = await getDocs(userQuery);
                 
                 if (userSnapshot.empty) {
-                    console.log('⚠️ User not found:', pred.userId);
+                    alert('User not found: ' + pred.userId);
                     continue;
                 }
                 
                 userSnapshot.forEach(async userDoc => {
                     const userData = userDoc.data();
                     const currentPoints = userData[gwField] || 0;
-                    const newPoints = currentPoints + points;
-                    
-                    console.log('Updating user:', userData.displayName);
-                    console.log('Current points:', currentPoints);
-                    console.log('New points:', newPoints);
                     
                     await updateDoc(doc(db, 'users', userDoc.id), {
-                        [gwField]: newPoints
+                        [gwField]: currentPoints + points
                     });
                     
-                    console.log('✅ User updated successfully!');
+                    updatedCount++;
+                    alert('✅ Updated ' + userData.displayName + ' +' + points + ' pts');
                 });
-            } else {
-                console.log('❌ No points awarded');
             }
         }
         
-        alert('✅ Points calculation complete! Check leaderboard.');
+        alert('Complete! Updated ' + updatedCount + ' users');
         
     } catch (error) {
-        console.error('❌ Error in calculatePoints:', error);
         alert('❌ Error: ' + error.message);
     }
 }
