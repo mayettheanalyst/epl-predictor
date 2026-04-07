@@ -67,12 +67,13 @@
             <button class="primary" onclick="logoutAdmin()">Logout</button>
             <button class="primary" onclick="showAdmin('users')">👥 Manage Users</button>
             <div id="admin-add" style="display:none;margin:10px 0;">
-                <input id="a-home" placeholder="Home Team">
-                <input id="a-away" placeholder="Away Team">
-                <input id="a-stadium" placeholder="Stadium">
-                <input type="datetime-local" id="a-kickoff">
-                <button class="primary success" onclick="addMatch()">Add</button>
-            </div>
+    <input type="number" id="a-gw" placeholder="Gameweek (e.g., 31)" value="31" style="width:100%;padding:12px;margin:5px 0;border:1px solid #ddd;border-radius:8px;">
+    <input id="a-home" placeholder="Home Team" style="width:100%;padding:12px;margin:5px 0;border:1px solid #ddd;border-radius:8px;">
+    <input id="a-away" placeholder="Away Team" style="width:100%;padding:12px;margin:5px 0;border:1px solid #ddd;border-radius:8px;">
+    <input id="a-stadium" placeholder="Stadium" style="width:100%;padding:12px;margin:5px 0;border:1px solid #ddd;border-radius:8px;">
+    <input type="datetime-local" id="a-kickoff" style="width:100%;padding:12px;margin:5px 0;border:1px solid #ddd;border-radius:8px;">
+    <button class="primary success" onclick="addMatch()">Add Match</button>
+</div>
             <div id="admin-results" style="display:none;margin:10px 0;">
                 <div id="results-list"></div>
             </div>
@@ -484,26 +485,40 @@ async function calculatePoints(matchId, homeScore, awayScore, gameweek) {
     if (section === 'users') loadUsersList();  // Add this line
 };
             
-            window.addMatch = async function() {
-                try {
-                    await addDoc(collection(db, 'matches'), {
-                        homeTeam: document.getElementById('a-home').value,
-                        awayTeam: document.getElementById('a-away').value,
-                        stadium: document.getElementById('a-stadium').value,
-                        gameweek: parseInt(document.getElementById('a-gw').value),
-                        kickoffTime: new Date(document.getElementById('a-kickoff').value),
-                        status: 'scheduled',
-                        realHomeScore: null,
-                        realAwayScore: null,
-                        createdAt: new Date()
-                    });
-                    alert('✅ Match added!');
-                    document.getElementById('a-home').value = '';
-                    document.getElementById('a-away').value = '';
-                } catch (error) {
-                    alert('Error: ' + error.message);
-                }
-            };
+               window.addMatch = async function() {
+    try {
+        const gw = parseInt(document.getElementById('a-gw').value);
+        const home = document.getElementById('a-home').value;
+        const away = document.getElementById('a-away').value;
+        const stadium = document.getElementById('a-stadium').value;
+        const kickoff = document.getElementById('a-kickoff').value;
+        
+        if (!gw || !home || !away || !kickoff) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        await addDoc(collection(db, 'matches'), {
+            homeTeam: home,
+            awayTeam: away,
+            stadium: stadium,
+            gameweek: gw,
+            kickoffTime: new Date(kickoff),
+            status: 'scheduled',
+            realHomeScore: null,
+            realAwayScore: null,
+            createdAt: new Date()
+        });
+        
+        alert('✅ Match added for GW' + gw + '!');
+        document.getElementById('a-home').value = '';
+        document.getElementById('a-away').value = '';
+        document.getElementById('a-stadium').value = '';
+        
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+};
             
             window.loadResultsSection = async function() {
                 const container = document.getElementById('results-list');
