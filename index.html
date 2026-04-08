@@ -257,6 +257,8 @@
 
             // Close modal
             window.closeModal = function() {
+                // Reset button text for next time
+                document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
                 document.getElementById('prediction-modal').classList.remove('active');
             };
 
@@ -346,8 +348,21 @@
                                 div.onclick = () => {
                                     currentMatchId = match.id;
                                     document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
-                                    document.getElementById('pred-home').value = '';
-                                    document.getElementById('pred-away').value = '';
+                                    
+                                    // Check if user already predicted
+                                    const userPred = userPreds[match.id];
+                                    if (userPred) {
+                                        // Edit mode - pre-fill existing prediction
+                                        document.getElementById('pred-home').value = userPred.homeScore;
+                                        document.getElementById('pred-away').value = userPred.awayScore;
+                                        document.querySelector('#prediction-modal button.success').textContent = '✏️ Update Prediction';
+                                    } else {
+                                        // New prediction
+                                        document.getElementById('pred-home').value = '';
+                                        document.getElementById('pred-away').value = '';
+                                        document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
+                                    }
+                                    
                                     document.getElementById('prediction-modal').classList.add('active');
                                 };
                             }
