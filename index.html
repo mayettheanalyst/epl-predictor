@@ -307,6 +307,23 @@
                 document.getElementById('prediction-modal').classList.remove('active');
             };
 
+            // Direct function to open prediction modal
+window.openPredictModal = function(matchId, homeTeam, awayTeam) {
+    console.log('Opening modal for:', matchId, homeTeam, 'vs', awayTeam);
+    
+    currentMatchId = matchId;
+    document.getElementById('prediction-match-info').textContent = homeTeam + ' vs ' + awayTeam;
+    document.getElementById('pred-home').value = '';
+    document.getElementById('pred-away').value = '';
+    document.getElementById('pred-team-name').value = '';
+    document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
+    
+    const modal = document.getElementById('prediction-modal');
+    modal.classList.add('active');
+    
+    console.log('Modal should be visible now');
+};
+
             // Submit all pending predictions to Firebase
             window.submitAllPredictions = async function() {
                 const pendingCount = Object.keys(pendingPredictions).length;
@@ -597,40 +614,13 @@
                                     </div>
                                 ` : ''}
                                 <div class="match-footer">
-                                    <span>📍 ${m.stadium || 'TBD'}</span>
-                                    ${isDone ? '<span style="color:#28a745;font-weight:bold;">✅ Finished</span>' : 
-                                      (hasPending ? '<span style="color:#ffc107;font-weight:bold;">⏳ Pending Submit</span>' : 
-                                      '<span style="color:#667eea;font-weight:bold;">🔮 Predict</span>')}
-                                </div>
+    <span>📍 ${m.stadium || 'TBD'}</span>
+    ${isDone ? '<span style="color:#28a745;font-weight:bold;">✅ Finished</span>' : 
+      (hasPending ? '<span style="color:#ffc107;font-weight:bold;">⏳ Pending Submit</span>' : 
+      `<button onclick="openPredictModal('${match.id}', '${m.homeTeam.replace(/'/g, "\\'")}', '${m.awayTeam.replace(/'/g, "\\'")}')" style="background:none;border:none;color:#667eea;font-weight:bold;cursor:pointer;font-size:13px;">🔮 Predict</button>`)}
+</div>
                             `;
                             
-                            if (!isDone && !isAdmin && userId) {
-                                div.style.cursor = 'pointer';
-                                div.onclick = (e) => {
-                                    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
-                                        return;
-                                    }
-                                    
-                                    currentMatchId = match.id;
-                                    document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
-                                    
-                                    const userPred = userPreds[match.id + '_default'] || userPreds[match.id];
-                                    
-                                    if (userPred) {
-                                        document.getElementById('pred-home').value = userPred.homeScore;
-                                        document.getElementById('pred-away').value = userPred.awayScore;
-                                        document.getElementById('pred-team-name').value = userPred.teamName || '';
-                                        document.querySelector('#prediction-modal button.success').textContent = '✏️ Update Prediction';
-                                    } else {
-                                        document.getElementById('pred-home').value = '';
-                                        document.getElementById('pred-away').value = '';
-                                        document.getElementById('pred-team-name').value = '';
-                                        document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
-                                    }
-                                    
-                                    document.getElementById('prediction-modal').classList.add('active');
-                                };
-                            }
                             container.appendChild(div);
                         });
                     });
