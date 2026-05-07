@@ -108,6 +108,15 @@
         </div>
     </div>
 
+    <!-- User Predictions Modal -->
+<div id="user-predictions-modal" class="modal">
+    <div style="background:white;border-radius:16px;padding:25px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">
+        <h3 style="text-align:center;margin-bottom:20px;" id="user-pred-title">👤 User Predictions</h3>
+        <div id="user-predictions-list" style="margin:20px 0;"></div>
+        <button onclick="closeUserPredictionsModal()" style="width:100%;padding:12px;border:none;border-radius:8px;background:#6c757d;color:white;font-weight:bold;">Close</button>
+    </div>
+</div>
+
     <script type="module">
         try {
             console.log('1. Starting...');
@@ -397,7 +406,24 @@
                         div.className = 'match-card';
                         div.style.padding = '15px';
                         div.style.marginBottom = '10px';
-                        div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong style="font-size:16px;">${rank}. ${u.displayName}</strong><div style="font-size:12px;color:#666;">GW${currentGW}: ${u.gwPoints} pts</div></div><div style="font-size:20px;font-weight:bold;color:#667eea;">${u.gwPoints} pts</div></div>`;
+                        div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="showUserPredictions('${docSnap.id}', '${u.displayName}')">
+        <div>
+            <strong style="font-size:16px;">${rank}. ${u.displayName}</strong>
+            <div style="font-size:12px;color:#666;">GW${currentGW}: ${u.gwPoints} pts</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:#667eea;">👁️ View</span>
+            <div style="font-size:20px;font-weight:bold;color:#667eea;">${u.gwPoints} pts</div>
+        </div>
+    </div>
+`;
+
+// Add click handler
+div.style.cursor = 'pointer';
+div.onclick = function() {
+    showUserPredictions(docSnap.id, u.displayName);
+};
                         container.appendChild(div);
                         rank++;
                     });
@@ -406,6 +432,81 @@
                     document.getElementById('leaderboard-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
                 }
             }
+
+            // Show user predictions modal
+window.showUserPredictions = async function(userId, displayName) {
+    const modal = document.getElementById('user-predictions-modal');
+    const title = document.getElementById('user-pred-title');
+    const list = document.getElementById('user-predictions-list');
+    
+    title.textContent = '👤 ' + displayName + "'s GW" + currentGW + " Predictions";
+    list.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+    modal.classList.add('active');
+    
+    try {
+        const predRef = collection(db, 'predictions');
+        const q = query(predRef, where('userId', '==', userId), where('gameweek', '==', currentGW));
+        const snapshot = await getDocs(q);
+        
+        list.innerHTML = '';
+        
+        if (snapshot.empty) {
+            list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
+            return;
+        }
+        
+        // Get match details for each prediction
+        for (const predDoc of snapshot.docs) {
+            const pred = predDoc.data();
+            
+            // Get match info
+            const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
+            const match = matchDoc.data();
+            
+            const div = document.createElement('div');
+            div.style.cssText = 'background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:10px;';
+            
+            // Check if result is out
+            const isFinished = match.status === 'finished';
+            const predCorrect = isFinished && (
+                (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) ? '✅ Exact!' :
+                ((pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
+                 (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
+                 (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)) ? '✓ Correct outcome' :
+                '✗ Wrong'
+            );
+            
+            div.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-weight:bold;">${match.homeTeam} vs ${match.awayTeam}</span>
+                    ${isFinished ? '<span style="font-size:12px;color:#28a745;">✅ Finished</span>' : '<span style="font-size:12px;color:#667eea;">⏳ Pending</span>'}
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-size:14px;">
+                        <span style="color:#666;">Predicted:</span>
+                        <span style="font-weight:bold;color:#667eea;margin-left:5px;">${pred.homeScore} - ${pred.awayScore}</span>
+                    </div>
+                    ${isFinished ? `
+                        <div style="font-size:14px;">
+                            <span style="color:#666;">Result:</span>
+                            <span style="font-weight:bold;color:#dc3545;margin-left:5px;">${match.realHomeScore} - ${match.realAwayScore}</span>
+                        </div>
+                        <div style="font-size:12px;font-weight:bold;color:${predCorrect.includes('Exact') ? '#28a745' : predCorrect.includes('Correct') ? '#667eea' : '#dc3545'};">${predCorrect}</div>
+                    ` : ''}
+                </div>
+            `;
+            list.appendChild(div);
+        }
+        
+    } catch (error) {
+        list.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
+    }
+};
+
+// Close user predictions modal
+window.closeUserPredictionsModal = function() {
+    document.getElementById('user-predictions-modal').classList.remove('active');
+};
             
             // Profile
             async function loadProfile() {
