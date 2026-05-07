@@ -410,64 +410,88 @@
 
             // Show user predictions modal
             window.showUserPredictions = async function(userId, teamName) {
-                const modal = document.getElementById('user-predictions-modal');
-                const title = document.getElementById('user-pred-title');
-                const list = document.getElementById('user-predictions-list');
-                title.textContent = '👤 ' + teamName + "'s GW" + currentGW + " Predictions";
-                list.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                modal.classList.add('active');
-                try {
-                    const predRef = collection(db, 'predictions');
-                    const q = query(predRef, 
-                        where('userId', '==', userId), 
-                        where('gameweek', '==', currentGW),
-                        where('teamName', '==', teamName)
-                    );
-                    const snapshot = await getDocs(q);
-                    list.innerHTML = '';
-                    if (snapshot.empty) {
-                        list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
-                        return;
-                    }
-                    for (const predDoc of snapshot.docs) {
-                        const pred = predDoc.data();
-                        const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
-                        const match = matchDoc.data();
-                        const div = document.createElement('div');
-                        div.style.cssText = 'background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:10px;';
-                        const isFinished = match.status === 'finished';
-                        const predCorrect = isFinished && (
-                            (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) ? '✅ Exact!' :
-                            ((pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
-                             (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
-                             (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)) ? '✓ Correct outcome' :
-                            '✗ Wrong'
-                        );
-                        div.innerHTML = `
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                <span style="font-weight:bold;">${match.homeTeam} vs ${match.awayTeam}</span>
-                                ${isFinished ? '<span style="font-size:12px;color:#28a745;">✅ Finished</span>' : '<span style="font-size:12px;color:#667eea;">⏳ Pending</span>'}
-                            </div>
-                            <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div style="font-size:14px;">
-                                    <span style="color:#666;">Predicted:</span>
-                                    <span style="font-weight:bold;color:#667eea;margin-left:5px;">${pred.homeScore} - ${pred.awayScore}</span>
-                                </div>
-                                ${isFinished ? `
-                                    <div style="font-size:14px;">
-                                        <span style="color:#666;">Result:</span>
-                                        <span style="font-weight:bold;color:#dc3545;margin-left:5px;">${match.realHomeScore} - ${match.realAwayScore}</span>
-                                    </div>
-                                    <div style="font-size:12px;font-weight:bold;color:${predCorrect.includes('Exact') ? '#28a745' : predCorrect.includes('Correct') ? '#667eea' : '#dc3545'};">${predCorrect}</div>
-                                ` : ''}
-                            </div>
-                        `;
-                        list.appendChild(div);
-                    }
-                } catch (error) {
-                    list.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
-                }
-            };
+    const modal = document.getElementById('user-predictions-modal');
+    const title = document.getElementById('user-pred-title');
+    const list = document.getElementById('user-predictions-list');
+    
+    // Get user's display name
+    const usersRef = collection(db, 'users');
+    const usersQuery = query(usersRef, where('userId', '==', userId));
+    const usersSnap = await getDocs(usersQuery);
+    let displayName = 'User';
+    if (!usersSnap.empty) {
+        displayName = usersSnap.docs[0].data().displayName || 'User';
+    }
+    
+    title.textContent = '👤 ' + displayName + "'s GW" + currentGW + " Predictions";
+    list.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+    modal.classList.add('active');
+    
+    try {
+        const predRef = collection(db, 'predictions');
+        // Query for this user's predictions (with OR without teamName for backwards compatibility)
+        const q = query(predRef, 
+            where('userId', '==', userId), 
+            where('gameweek', '==', currentGW)
+        );
+        const snapshot = await getDocs(q);
+        
+        list.innerHTML = '';
+        
+        if (snapshot.empty) {
+            list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
+            return;
+        }
+        
+        // Filter by team name if provided (for new predictions with team names)
+        let predictions = snapshot.docs.map(doc => doc.data());
+        if (teamName && teamName !== 'User') {
+            predictions = predictions.filter(pred => pred.teamName === teamName);
+        }
+        
+        if (predictions.length === 0) {
+            list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
+            return;
+        }
+        
+        for (const pred of predictions) {
+            const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
+            const match = matchDoc.data();
+            const div = document.createElement('div');
+            div.style.cssText = 'background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:10px;';
+            const isFinished = match.status === 'finished';
+            const predCorrect = isFinished && (
+                (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) ? '✅ Exact!' :
+                ((pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
+                 (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
+                 (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)) ? '✓ Correct outcome' :
+                '✗ Wrong'
+            );
+            div.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-weight:bold;">${match.homeTeam} vs ${match.awayTeam}</span>
+                    ${isFinished ? '<span style="font-size:12px;color:#28a745;">✅ Finished</span>' : '<span style="font-size:12px;color:#667eea;">⏳ Pending</span>'}
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-size:14px;">
+                        <span style="color:#666;">Predicted:</span>
+                        <span style="font-weight:bold;color:#667eea;margin-left:5px;">${pred.homeScore} - ${pred.awayScore}</span>
+                    </div>
+                    ${isFinished ? `
+                        <div style="font-size:14px;">
+                            <span style="color:#666;">Result:</span>
+                            <span style="font-weight:bold;color:#dc3545;margin-left:5px;">${match.realHomeScore} - ${match.realAwayScore}</span>
+                        </div>
+                        <div style="font-size:12px;font-weight:bold;color:${predCorrect.includes('Exact') ? '#28a745' : predCorrect.includes('Correct') ? '#667eea' : '#dc3545'};">${predCorrect}</div>
+                    ` : ''}
+                </div>
+            `;
+            list.appendChild(div);
+        }
+    } catch (error) {
+        list.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
+    }
+};
 
             // Close user predictions modal
             window.closeUserPredictionsModal = function() {
@@ -615,100 +639,112 @@
             
             // Leaderboard - Shows each team separately
             async function loadLeaderboard() {
-                try {
-                    const container = document.getElementById('leaderboard-list');
-                    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-                    
-                    // Get all predictions for this gameweek
-                    const predRef = collection(db, 'predictions');
-                    const predQ = query(predRef, where('gameweek', '==', currentGW));
-                    const predSnapshot = await getDocs(predQ);
-                    
-                    // Group predictions by team (userId + teamName)
-                    const teamPoints = {};
-                    for (const predDoc of predSnapshot.docs) {
-                        const pred = predDoc.data();
-                        const teamKey = pred.userId + '_' + (pred.teamName || 'default');
-                        
-                        if (!teamPoints[teamKey]) {
-                            teamPoints[teamKey] = {
-                                userId: pred.userId,
-                                teamName: pred.teamName || 'User',
-                                points: 0,
-                                predictions: []
-                            };
-                        }
-                        teamPoints[teamKey].predictions.push(pred);
+    try {
+        const container = document.getElementById('leaderboard-list');
+        container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+        
+        // Get all predictions for this gameweek
+        const predRef = collection(db, 'predictions');
+        const predQ = query(predRef, where('gameweek', '==', currentGW));
+        const predSnapshot = await getDocs(predQ);
+        
+        // Group predictions by user (userId + teamName)
+        const teamPoints = {};
+        const userDisplayNames = {};  // Store display names
+        
+        // Get all users to map userId to displayName
+        const usersRef = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersRef);
+        usersSnapshot.forEach(doc => {
+            const userData = doc.data();
+            userDisplayNames[userData.userId] = userData.displayName || 'User';
+        });
+        
+        for (const predDoc of predSnapshot.docs) {
+            const pred = predDoc.data();
+            const teamName = pred.teamName || userDisplayNames[pred.userId] || 'User';
+            const teamKey = pred.userId + '_' + (pred.teamName || 'default');
+            
+            if (!teamPoints[teamKey]) {
+                teamPoints[teamKey] = {
+                    userId: pred.userId,
+                    teamName: teamName,
+                    displayName: userDisplayNames[pred.userId] || 'User',
+                    points: 0,
+                    predictions: []
+                };
+            }
+            teamPoints[teamKey].predictions.push(pred);
+        }
+        
+        // Calculate points for each team
+        const matchesCache = {};
+        for (const teamKey in teamPoints) {
+            const team = teamPoints[teamKey];
+            for (const pred of team.predictions) {
+                // Get match result
+                if (!matchesCache[pred.matchId]) {
+                    const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
+                    matchesCache[pred.matchId] = matchDoc.data();
+                }
+                const match = matchesCache[pred.matchId];
+                
+                if (match && match.status === 'finished') {
+                    let points = 0;
+                    if (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) {
+                        points = 5;
+                    } else if (
+                        (pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
+                        (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
+                        (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)
+                    ) {
+                        points = 3;
                     }
-                    
-                    // Calculate points for each team
-                    const matchesCache = {};
-                    for (const teamKey in teamPoints) {
-                        const team = teamPoints[teamKey];
-                        for (const pred of team.predictions) {
-                            // Get match result
-                            if (!matchesCache[pred.matchId]) {
-                                const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
-                                matchesCache[pred.matchId] = matchDoc.data();
-                            }
-                            const match = matchesCache[pred.matchId];
-                            
-                            if (match && match.status === 'finished') {
-                                let points = 0;
-                                if (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) {
-                                    points = 5;
-                                } else if (
-                                    (pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
-                                    (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
-                                    (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)
-                                ) {
-                                    points = 3;
-                                }
-                                team.points += points;
-                            }
-                        }
-                    }
-                    
-                    // Convert to array and sort
-                    const teamsArray = Object.values(teamPoints);
-                    teamsArray.sort((a, b) => b.points - a.points);
-                    
-                    container.innerHTML = '';
-                    
-                    if (teamsArray.length === 0) {
-                        container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
-                        return;
-                    }
-                    
-                    // Display leaderboard
-                    let rank = 1;
-                    teamsArray.forEach(team => {
-                        const div = document.createElement('div');
-                        div.className = 'match-card';
-                        div.style.padding = '15px';
-                        div.style.marginBottom = '10px';
-                        
-                        div.innerHTML = `
-                            <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="showUserPredictions('${team.userId}', '${team.teamName}')">
-                                <div>
-                                    <strong style="font-size:16px;">${rank}. ${team.teamName}</strong>
-                                    <div style="font-size:12px;color:#666;">GW${currentGW}: ${team.points} pts</div>
-                                </div>
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <span style="font-size:12px;color:#667eea;">👁️ View</span>
-                                    <div style="font-size:20px;font-weight:bold;color:#667eea;">${team.points} pts</div>
-                                </div>
-                            </div>
-                        `;
-                        container.appendChild(div);
-                        rank++;
-                    });
-                    
-                } catch (error) {
-                    console.error('Error:', error);
-                    document.getElementById('leaderboard-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
+                    team.points += points;
                 }
             }
+        }
+        
+        // Convert to array and sort
+        const teamsArray = Object.values(teamPoints);
+        teamsArray.sort((a, b) => b.points - a.points);
+        
+        container.innerHTML = '';
+        
+        if (teamsArray.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
+            return;
+        }
+        
+        // Display leaderboard
+        let rank = 1;
+        teamsArray.forEach(team => {
+            const div = document.createElement('div');
+            div.className = 'match-card';
+            div.style.padding = '15px';
+            div.style.marginBottom = '10px';
+            
+            div.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="showUserPredictions('${team.userId}', '${team.teamName.replace(/'/g, "\\'")}')">
+                    <div>
+                        <strong style="font-size:16px;">${rank}. ${team.displayName}</strong>
+                        <div style="font-size:12px;color:#666;">GW${currentGW}: ${team.points} pts</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:12px;color:#667eea;">👁️ View</span>
+                        <div style="font-size:20px;font-weight:bold;color:#667eea;">${team.points} pts</div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+            rank++;
+        });
+        
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('leaderboard-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
+    }
+}
             
             // Profile
             async function loadProfile() {
