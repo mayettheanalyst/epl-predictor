@@ -415,13 +415,15 @@
     const list = document.getElementById('user-predictions-list');
     
     // Get user's display name
-    const usersRef = collection(db, 'users');
-    const usersQuery = query(usersRef, where('userId', '==', userId));
-    const usersSnap = await getDocs(usersQuery);
     let displayName = 'User';
-    if (!usersSnap.empty) {
-        displayName = usersSnap.docs[0].data().displayName || 'User';
-    }
+    try {
+        const usersRef = collection(db, 'users');
+        const usersQuery = query(usersRef, where('userId', '==', userId));
+        const usersSnap = await getDocs(usersQuery);
+        if (!usersSnap.empty) {
+            displayName = usersSnap.docs[0].data().displayName || 'User';
+        }
+    } catch (e) { console.log('Could not fetch user name'); }
     
     title.textContent = '👤 ' + displayName + "'s GW" + currentGW + " Predictions";
     list.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
@@ -429,7 +431,8 @@
     
     try {
         const predRef = collection(db, 'predictions');
-        // Query for this user's predictions (with OR without teamName for backwards compatibility)
+        
+        // Simple query: just userId + gameweek (no teamName filter)
         const q = query(predRef, 
             where('userId', '==', userId), 
             where('gameweek', '==', currentGW)
@@ -443,23 +446,29 @@
             return;
         }
         
-        // Filter by team name if provided (for new predictions with team names)
-        let predictions = snapshot.docs.map(doc => doc.data());
-        if (teamName && teamName !== 'User') {
-            predictions = predictions.filter(pred => pred.teamName === teamName);
-        }
-        
-        if (predictions.length === 0) {
-            list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
-            return;
-        }
-        
-        for (const pred of predictions) {
+        let count = 0;
+        for (const predDoc of snapshot.docs) {
+            const pred = predDoc.data();
+            
+            // If teamName was specified, only show matching predictions
+            // But if pred.teamName doesn't exist (old prediction), show it anyway
+            if (teamName && teamName !== 'User' && teamName !== 'default') {
+                if (pred.teamName && pred.teamName !== teamName) {
+                    continue;  // Skip this prediction
+                }
+            }
+            
             const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
             const match = matchDoc.data();
+            if (!match) continue;
+            
             const div = document.createElement('div');
             div.style.cssText = 'background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:10px;';
             const isFinished = match.status === 'finished';
+            
+            // Show team name if it exists
+            const teamLabel = pred.teamName ? ` (${pred.teamName})` : '';
+            
             const predCorrect = isFinished && (
                 (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) ? '✅ Exact!' :
                 ((pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
@@ -467,9 +476,10 @@
                  (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)) ? '✓ Correct outcome' :
                 '✗ Wrong'
             );
+            
             div.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-weight:bold;">${match.homeTeam} vs ${match.awayTeam}</span>
+                    <span style="font-weight:bold;">${match.homeTeam} vs ${match.awayTeam}${teamLabel}</span>
                     ${isFinished ? '<span style="font-size:12px;color:#28a745;">✅ Finished</span>' : '<span style="font-size:12px;color:#667eea;">⏳ Pending</span>'}
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -487,8 +497,15 @@
                 </div>
             `;
             list.appendChild(div);
+            count++;
         }
+        
+        if (count === 0) {
+            list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions found for this team</div>';
+        }
+        
     } catch (error) {
+        console.error('Error loading predictions:', error);
         list.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
     }
 };
