@@ -160,7 +160,7 @@
             let currentGW = 31;
             let isAdmin = false;
             let currentMatchId = null;
-            let pendingPredictions = {};  // Stores predictions before submit all
+            let pendingPredictions = {};
 
             // Load users list for admin
             async function loadUsersList() {
@@ -286,21 +286,17 @@
                     return; 
                 }
                 
-                // Determine team name
                 let teamName = teamNameInput || user?.first_name || 'User';
                 
-                // Save to pending predictions (NOT to Firebase yet)
                 pendingPredictions[currentMatchId] = {
                     homeScore: homeScore,
                     awayScore: awayScore,
                     teamName: teamName
                 };
                 
-                // Update the pending count display
                 updatePendingCount();
-                
                 closeModal();
-                loadMatches();  // Reload to show prediction saved indicator
+                loadMatches();
                 
                 alert('✅ Prediction saved! Click "Submit All" when ready.');
             };
@@ -332,7 +328,6 @@
                         const pred = pendingPredictions[matchId];
                         
                         try {
-                            // Check if match has started
                             const matchDoc = await getDoc(doc(db, 'matches', matchId));
                             const matchData = matchDoc.data();
                             
@@ -344,7 +339,6 @@
                                 }
                             }
                             
-                            // Check if prediction already exists for this team
                             const predRef = collection(db, 'predictions');
                             const existingQuery = query(predRef, 
                                 where('userId', '==', userId), 
@@ -354,7 +348,6 @@
                             const existingSnap = await getDocs(existingQuery);
                             
                             if (!existingSnap.empty) {
-                                // Update existing
                                 const predDoc = existingSnap.docs[0];
                                 await updateDoc(doc(db, 'predictions', predDoc.id), { 
                                     homeScore: pred.homeScore, 
@@ -363,7 +356,6 @@
                                     updatedAt: new Date() 
                                 });
                             } else {
-                                // Create new
                                 await addDoc(predRef, { 
                                     userId: userId, 
                                     teamName: pred.teamName,
@@ -383,7 +375,6 @@
                         }
                     }
                     
-                    // Clear pending predictions
                     pendingPredictions = {};
                     updatePendingCount();
                     
@@ -410,105 +401,98 @@
 
             // Show user predictions modal
             window.showUserPredictions = async function(userId, teamName) {
-    const modal = document.getElementById('user-predictions-modal');
-    const title = document.getElementById('user-pred-title');
-    const list = document.getElementById('user-predictions-list');
-    
-    // Get user's display name
-    let displayName = 'User';
-    try {
-        const usersRef = collection(db, 'users');
-        const usersQuery = query(usersRef, where('userId', '==', userId));
-        const usersSnap = await getDocs(usersQuery);
-        if (!usersSnap.empty) {
-            displayName = usersSnap.docs[0].data().displayName || 'User';
-        }
-    } catch (e) { console.log('Could not fetch user name'); }
-    
-    title.textContent = '👤 ' + displayName + "'s GW" + currentGW + " Predictions";
-    list.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-    modal.classList.add('active');
-    
-    try {
-        const predRef = collection(db, 'predictions');
-        
-        // Simple query: just userId + gameweek (no teamName filter)
-        const q = query(predRef, 
-            where('userId', '==', userId), 
-            where('gameweek', '==', currentGW)
-        );
-        const snapshot = await getDocs(q);
-        
-        list.innerHTML = '';
-        
-        if (snapshot.empty) {
-            list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
-            return;
-        }
-        
-        let count = 0;
-        for (const predDoc of snapshot.docs) {
-            const pred = predDoc.data();
-            
-            // If teamName was specified, only show matching predictions
-            // But if pred.teamName doesn't exist (old prediction), show it anyway
-            if (teamName && teamName !== 'User' && teamName !== 'default') {
-                if (pred.teamName && pred.teamName !== teamName) {
-                    continue;  // Skip this prediction
+                const modal = document.getElementById('user-predictions-modal');
+                const title = document.getElementById('user-pred-title');
+                const list = document.getElementById('user-predictions-list');
+                
+                let displayName = 'User';
+                try {
+                    const usersRef = collection(db, 'users');
+                    const usersQuery = query(usersRef, where('userId', '==', userId));
+                    const usersSnap = await getDocs(usersQuery);
+                    if (!usersSnap.empty) {
+                        displayName = usersSnap.docs[0].data().displayName || 'User';
+                    }
+                } catch (e) { console.log('Could not fetch user name'); }
+                
+                title.textContent = '👤 ' + displayName + "'s GW" + currentGW + " Predictions";
+                list.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                modal.classList.add('active');
+                
+                try {
+                    const predRef = collection(db, 'predictions');
+                    const q = query(predRef, 
+                        where('userId', '==', userId), 
+                        where('gameweek', '==', currentGW)
+                    );
+                    const snapshot = await getDocs(q);
+                    
+                    list.innerHTML = '';
+                    
+                    if (snapshot.empty) {
+                        list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
+                        return;
+                    }
+                    
+                    let count = 0;
+                    for (const predDoc of snapshot.docs) {
+                        const pred = predDoc.data();
+                        
+                        if (teamName && teamName !== 'User' && teamName !== 'default') {
+                            if (pred.teamName && pred.teamName !== teamName) {
+                                continue;
+                            }
+                        }
+                        
+                        const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
+                        const match = matchDoc.data();
+                        if (!match) continue;
+                        
+                        const div = document.createElement('div');
+                        div.style.cssText = 'background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:10px;';
+                        const isFinished = match.status === 'finished';
+                        const teamLabel = pred.teamName ? ` (${pred.teamName})` : '';
+                        
+                        const predCorrect = isFinished && (
+                            (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) ? '✅ Exact!' :
+                            ((pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
+                             (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
+                             (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)) ? '✓ Correct outcome' :
+                            '✗ Wrong'
+                        );
+                        
+                        div.innerHTML = `
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <span style="font-weight:bold;">${match.homeTeam} vs ${match.awayTeam}${teamLabel}</span>
+                                ${isFinished ? '<span style="font-size:12px;color:#28a745;">✅ Finished</span>' : '<span style="font-size:12px;color:#667eea;">⏳ Pending</span>'}
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div style="font-size:14px;">
+                                    <span style="color:#666;">Predicted:</span>
+                                    <span style="font-weight:bold;color:#667eea;margin-left:5px;">${pred.homeScore} - ${pred.awayScore}</span>
+                                </div>
+                                ${isFinished ? `
+                                    <div style="font-size:14px;">
+                                        <span style="color:#666;">Result:</span>
+                                        <span style="font-weight:bold;color:#dc3545;margin-left:5px;">${match.realHomeScore} - ${match.realAwayScore}</span>
+                                    </div>
+                                    <div style="font-size:12px;font-weight:bold;color:${predCorrect.includes('Exact') ? '#28a745' : predCorrect.includes('Correct') ? '#667eea' : '#dc3545'};">${predCorrect}</div>
+                                ` : ''}
+                            </div>
+                        `;
+                        list.appendChild(div);
+                        count++;
+                    }
+                    
+                    if (count === 0) {
+                        list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions found for this team</div>';
+                    }
+                    
+                } catch (error) {
+                    console.error('Error loading predictions:', error);
+                    list.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
                 }
-            }
-            
-            const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
-            const match = matchDoc.data();
-            if (!match) continue;
-            
-            const div = document.createElement('div');
-            div.style.cssText = 'background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:10px;';
-            const isFinished = match.status === 'finished';
-            
-            // Show team name if it exists
-            const teamLabel = pred.teamName ? ` (${pred.teamName})` : '';
-            
-            const predCorrect = isFinished && (
-                (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) ? '✅ Exact!' :
-                ((pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
-                 (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
-                 (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)) ? '✓ Correct outcome' :
-                '✗ Wrong'
-            );
-            
-            div.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-weight:bold;">${match.homeTeam} vs ${match.awayTeam}${teamLabel}</span>
-                    ${isFinished ? '<span style="font-size:12px;color:#28a745;">✅ Finished</span>' : '<span style="font-size:12px;color:#667eea;">⏳ Pending</span>'}
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div style="font-size:14px;">
-                        <span style="color:#666;">Predicted:</span>
-                        <span style="font-weight:bold;color:#667eea;margin-left:5px;">${pred.homeScore} - ${pred.awayScore}</span>
-                    </div>
-                    ${isFinished ? `
-                        <div style="font-size:14px;">
-                            <span style="color:#666;">Result:</span>
-                            <span style="font-weight:bold;color:#dc3545;margin-left:5px;">${match.realHomeScore} - ${match.realAwayScore}</span>
-                        </div>
-                        <div style="font-size:12px;font-weight:bold;color:${predCorrect.includes('Exact') ? '#28a745' : predCorrect.includes('Correct') ? '#667eea' : '#dc3545'};">${predCorrect}</div>
-                    ` : ''}
-                </div>
-            `;
-            list.appendChild(div);
-            count++;
-        }
-        
-        if (count === 0) {
-            list.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions found for this team</div>';
-        }
-        
-    } catch (error) {
-        console.error('Error loading predictions:', error);
-        list.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:15px;border-radius:8px;">Error: ' + error.message + '</div>';
-    }
-};
+            };
 
             // Close user predictions modal
             window.closeUserPredictionsModal = function() {
@@ -542,7 +526,6 @@
                         const predSnap = await getDocs(predQ);
                         predSnap.forEach(d => { 
                             const data = d.data();
-                            // Store with teamName as key so multiple teams show separately
                             const key = data.matchId + '_' + (data.teamName || 'default');
                             userPreds[key] = data; 
                         });
@@ -621,149 +604,146 @@
                                 </div>
                             `;
                             
-                            
+                            if (!isDone && !isAdmin && userId) {
+                                div.style.cursor = 'pointer';
+                                div.onclick = (e) => {
+                                    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+                                        return;
+                                    }
+                                    
+                                    currentMatchId = match.id;
+                                    document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
+                                    
+                                    const userPred = userPreds[match.id + '_default'] || userPreds[match.id];
+                                    
+                                    if (userPred) {
+                                        document.getElementById('pred-home').value = userPred.homeScore;
+                                        document.getElementById('pred-away').value = userPred.awayScore;
+                                        document.getElementById('pred-team-name').value = userPred.teamName || '';
+                                        document.querySelector('#prediction-modal button.success').textContent = '✏️ Update Prediction';
+                                    } else {
+                                        document.getElementById('pred-home').value = '';
+                                        document.getElementById('pred-away').value = '';
+                                        document.getElementById('pred-team-name').value = '';
+                                        document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
+                                    }
+                                    
+                                    document.getElementById('prediction-modal').classList.add('active');
+                                };
+                            }
+                            container.appendChild(div);
+                        });
+                    });
+                    
+                    updatePendingCount();
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    document.getElementById('matches-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
+                }
+            }
             
             // Leaderboard - Shows each team separately
             async function loadLeaderboard() {
-    try {
-        const container = document.getElementById('leaderboard-list');
-        container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
-        
-        // Get all predictions for this gameweek
-        const predRef = collection(db, 'predictions');
-        const predQ = query(predRef, where('gameweek', '==', currentGW));
-        const predSnapshot = await getDocs(predQ);
-        
-        // Group predictions by user (userId + teamName)
-        const teamPoints = {};
-        const userDisplayNames = {};  // Store display names
-        
-        // Get all users to map userId to displayName
-        const usersRef = collection(db, 'users');
-        const usersSnapshot = await getDocs(usersRef);
-        usersSnapshot.forEach(doc => {
-            const userData = doc.data();
-            userDisplayNames[userData.userId] = userData.displayName || 'User';
-        });
-        
-        for (const predDoc of predSnapshot.docs) {
-            const pred = predDoc.data();
-            const teamName = pred.teamName || userDisplayNames[pred.userId] || 'User';
-            const teamKey = pred.userId + '_' + (pred.teamName || 'default');
-            
-            if (!teamPoints[teamKey]) {
-                teamPoints[teamKey] = {
-                    userId: pred.userId,
-                    teamName: teamName,
-                    displayName: userDisplayNames[pred.userId] || 'User',
-                    points: 0,
-                    predictions: []
-                };
-            }
-            teamPoints[teamKey].predictions.push(pred);
-        }
-     if (!isDone && !isAdmin && userId) {
-    div.style.cursor = 'pointer';
-    div.onclick = (e) => {
-        // Prevent opening if clicking on buttons or inputs
-        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
-            return;
-        }
-        
-        currentMatchId = match.id;
-        document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
-        
-        const userPred = userPreds[match.id + '_default'] || userPreds[match.id];
-        
-        if (userPred) {
-            // Edit mode - pre-fill existing prediction
-            document.getElementById('pred-home').value = userPred.homeScore;
-            document.getElementById('pred-away').value = userPred.awayScore;
-            document.getElementById('pred-team-name').value = userPred.teamName || '';
-            document.querySelector('#prediction-modal button.success').textContent = '✏️ Update Prediction';
-        } else {
-            // New prediction
-            document.getElementById('pred-home').value = '';
-            document.getElementById('pred-away').value = '';
-            document.getElementById('pred-team-name').value = '';
-            document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
-        }
-        
-        // Show modal
-        const modal = document.getElementById('prediction-modal');
-        modal.classList.add('active');
-        
-        console.log('Modal opened for match:', match.id);
-    };
-                }   
-        // Calculate points for each team
-        const matchesCache = {};
-        for (const teamKey in teamPoints) {
-            const team = teamPoints[teamKey];
-            for (const pred of team.predictions) {
-                // Get match result
-                if (!matchesCache[pred.matchId]) {
-                    const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
-                    matchesCache[pred.matchId] = matchDoc.data();
-                }
-                const match = matchesCache[pred.matchId];
-                
-                if (match && match.status === 'finished') {
-                    let points = 0;
-                    if (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) {
-                        points = 5;
-                    } else if (
-                        (pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
-                        (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
-                        (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)
-                    ) {
-                        points = 3;
+                try {
+                    const container = document.getElementById('leaderboard-list');
+                    container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...</div>';
+                    
+                    const predRef = collection(db, 'predictions');
+                    const predQ = query(predRef, where('gameweek', '==', currentGW));
+                    const predSnapshot = await getDocs(predQ);
+                    
+                    const teamPoints = {};
+                    const userDisplayNames = {};
+                    
+                    const usersRef = collection(db, 'users');
+                    const usersSnapshot = await getDocs(usersRef);
+                    usersSnapshot.forEach(doc => {
+                        const userData = doc.data();
+                        userDisplayNames[userData.userId] = userData.displayName || 'User';
+                    });
+                    
+                    for (const predDoc of predSnapshot.docs) {
+                        const pred = predDoc.data();
+                        const teamName = pred.teamName || userDisplayNames[pred.userId] || 'User';
+                        const teamKey = pred.userId + '_' + (pred.teamName || 'default');
+                        
+                        if (!teamPoints[teamKey]) {
+                            teamPoints[teamKey] = {
+                                userId: pred.userId,
+                                teamName: teamName,
+                                displayName: userDisplayNames[pred.userId] || 'User',
+                                points: 0,
+                                predictions: []
+                            };
+                        }
+                        teamPoints[teamKey].predictions.push(pred);
                     }
-                    team.points += points;
+                    
+                    const matchesCache = {};
+                    for (const teamKey in teamPoints) {
+                        const team = teamPoints[teamKey];
+                        for (const pred of team.predictions) {
+                            if (!matchesCache[pred.matchId]) {
+                                const matchDoc = await getDoc(doc(db, 'matches', pred.matchId));
+                                matchesCache[pred.matchId] = matchDoc.data();
+                            }
+                            const match = matchesCache[pred.matchId];
+                            
+                            if (match && match.status === 'finished') {
+                                let points = 0;
+                                if (pred.homeScore === match.realHomeScore && pred.awayScore === match.realAwayScore) {
+                                    points = 5;
+                                } else if (
+                                    (pred.homeScore > pred.awayScore && match.realHomeScore > match.realAwayScore) ||
+                                    (pred.homeScore < pred.awayScore && match.realHomeScore < match.realAwayScore) ||
+                                    (pred.homeScore === pred.awayScore && match.realHomeScore === match.realAwayScore)
+                                ) {
+                                    points = 3;
+                                }
+                                team.points += points;
+                            }
+                        }
+                    }
+                    
+                    const teamsArray = Object.values(teamPoints);
+                    teamsArray.sort((a, b) => b.points - a.points);
+                    
+                    container.innerHTML = '';
+                    
+                    if (teamsArray.length === 0) {
+                        container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
+                        return;
+                    }
+                    
+                    let rank = 1;
+                    teamsArray.forEach(team => {
+                        const div = document.createElement('div');
+                        div.className = 'match-card';
+                        div.style.padding = '15px';
+                        div.style.marginBottom = '10px';
+                        
+                        div.innerHTML = `
+                            <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="showUserPredictions('${team.userId}', '${team.teamName.replace(/'/g, "\\'")}')">
+                                <div>
+                                    <strong style="font-size:16px;">${rank}. ${team.displayName}</strong>
+                                    <div style="font-size:12px;color:#666;">GW${currentGW}: ${team.points} pts</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <span style="font-size:12px;color:#667eea;">👁️ View</span>
+                                    <div style="font-size:20px;font-weight:bold;color:#667eea;">${team.points} pts</div>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(div);
+                        rank++;
+                    });
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    document.getElementById('leaderboard-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
                 }
             }
-        }
-        
-        // Convert to array and sort
-        const teamsArray = Object.values(teamPoints);
-        teamsArray.sort((a, b) => b.points - a.points);
-        
-        container.innerHTML = '';
-        
-        if (teamsArray.length === 0) {
-            container.innerHTML = '<div style="text-align:center;padding:20px;color:#666;">No predictions for GW' + currentGW + '</div>';
-            return;
-        }
-        
-        // Display leaderboard
-        let rank = 1;
-        teamsArray.forEach(team => {
-            const div = document.createElement('div');
-            div.className = 'match-card';
-            div.style.padding = '15px';
-            div.style.marginBottom = '10px';
-            
-            div.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="showUserPredictions('${team.userId}', '${team.teamName.replace(/'/g, "\\'")}')">
-                    <div>
-                        <strong style="font-size:16px;">${rank}. ${team.displayName}</strong>
-                        <div style="font-size:12px;color:#666;">GW${currentGW}: ${team.points} pts</div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <span style="font-size:12px;color:#667eea;">👁️ View</span>
-                        <div style="font-size:20px;font-weight:bold;color:#667eea;">${team.points} pts</div>
-                    </div>
-                </div>
-            `;
-            container.appendChild(div);
-            rank++;
-        });
-        
-    } catch (error) {
-        console.error('Error:', error);
-        document.getElementById('leaderboard-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
-    }
-}
             
             // Profile
             async function loadProfile() {
