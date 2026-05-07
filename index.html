@@ -621,38 +621,7 @@
                                 </div>
                             `;
                             
-                            if (!isDone && !isAdmin && userId) {
-                                div.style.cursor = 'pointer';
-                                div.onclick = () => {
-                                    currentMatchId = match.id;
-                                    document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
-                                    const userPred = userPreds[match.id + '_default'] || userPreds[match.id];
-                                    if (userPred) {
-                                        document.getElementById('pred-home').value = userPred.homeScore;
-                                        document.getElementById('pred-away').value = userPred.awayScore;
-                                        document.getElementById('pred-team-name').value = userPred.teamName || '';
-                                        document.querySelector('#prediction-modal button.success').textContent = '✏️ Update Prediction';
-                                    } else {
-                                        document.getElementById('pred-home').value = '';
-                                        document.getElementById('pred-away').value = '';
-                                        document.getElementById('pred-team-name').value = '';
-                                        document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
-                                    }
-                                    document.getElementById('prediction-modal').classList.add('active');
-                                };
-                            }
-                            container.appendChild(div);
-                        });
-                    });
-                    
-                    // Show/hide submit all button
-                    updatePendingCount();
-                    
-                } catch (error) {
-                    console.error('Error:', error);
-                    document.getElementById('matches-list').innerHTML = '<div class="error-box">Error: ' + error.message + '</div>';
-                }
-            }
+                            
             
             // Leaderboard - Shows each team separately
             async function loadLeaderboard() {
@@ -693,7 +662,40 @@
             }
             teamPoints[teamKey].predictions.push(pred);
         }
+     if (!isDone && !isAdmin && userId) {
+    div.style.cursor = 'pointer';
+    div.onclick = (e) => {
+        // Prevent opening if clicking on buttons or inputs
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+            return;
+        }
         
+        currentMatchId = match.id;
+        document.getElementById('prediction-match-info').textContent = m.homeTeam + ' vs ' + m.awayTeam;
+        
+        const userPred = userPreds[match.id + '_default'] || userPreds[match.id];
+        
+        if (userPred) {
+            // Edit mode - pre-fill existing prediction
+            document.getElementById('pred-home').value = userPred.homeScore;
+            document.getElementById('pred-away').value = userPred.awayScore;
+            document.getElementById('pred-team-name').value = userPred.teamName || '';
+            document.querySelector('#prediction-modal button.success').textContent = '✏️ Update Prediction';
+        } else {
+            // New prediction
+            document.getElementById('pred-home').value = '';
+            document.getElementById('pred-away').value = '';
+            document.getElementById('pred-team-name').value = '';
+            document.querySelector('#prediction-modal button.success').textContent = 'Submit Prediction';
+        }
+        
+        // Show modal
+        const modal = document.getElementById('prediction-modal');
+        modal.classList.add('active');
+        
+        console.log('Modal opened for match:', match.id);
+    };
+                }   
         // Calculate points for each team
         const matchesCache = {};
         for (const teamKey in teamPoints) {
